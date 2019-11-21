@@ -204,14 +204,14 @@ class INFOGAN():
             for j in range(r):
                 axs[j,i].imshow(gen_imgs[j,:,:,0], cmap='gray')
                 axs[j,i].axis('off')
-        fig.savefig("images/%d.png" % epoch)
+        fig.savefig("/Keras-GAN/infogan/images/%d.png" % epoch)
         plt.close()
 
     def save_model(self):
 
         def save(model, model_name):
-            model_path = "saved_model/%s.json" % model_name
-            weights_path = "saved_model/%s_weights.hdf5" % model_name
+            model_path = "/Keras-GAN/infogan/saved_model/%s.json" % model_name
+            weights_path = "/Keras-GAN/infogan/saved_model/%s_weights.hdf5" % model_name
             options = {"file_arch": model_path,
                         "file_weight": weights_path}
             json_string = model.to_json()

@@ -9,7 +9,7 @@ class DataLoader():
 
     def load_data(self, domain, batch_size=1, is_testing=False):
         data_type = "train%s" % domain if not is_testing else "test%s" % domain
-        path = glob('./datasets/%s/%s/*' % (self.dataset_name, data_type))
+        path = glob('/Keras-GAN/cyclegan/datasets/%s/%s/*' % (self.dataset_name, data_type))
 
         batch_images = np.random.choice(path, size=batch_size)
 
@@ -31,8 +31,8 @@ class DataLoader():
 
     def load_batch(self, batch_size=1, is_testing=False):
         data_type = "train" if not is_testing else "val"
-        path_A = glob('./datasets/%s/%sA/*' % (self.dataset_name, data_type))
-        path_B = glob('./datasets/%s/%sB/*' % (self.dataset_name, data_type))
+        path_A = glob('/Keras-GAN/cyclegan/datasets/%s/%sA/*' % (self.dataset_name, data_type))
+        path_B = glob('/Keras-GAN/cyclegan/datasets/%s/%sB/*' % (self.dataset_name, data_type))
 
         self.n_batches = int(min(len(path_A), len(path_B)) / batch_size)
         total_samples = self.n_batches * batch_size

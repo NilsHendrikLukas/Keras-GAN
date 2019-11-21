@@ -258,14 +258,14 @@ class SRGAN():
                 axs[row, col].set_title(titles[col])
                 axs[row, col].axis('off')
             cnt += 1
-        fig.savefig("images/%s/%d.png" % (self.dataset_name, epoch))
+        fig.savefig("/Keras-GAN/srgan/images/%s/%d.png" % (self.dataset_name, epoch))
         plt.close()
 
         # Save low resolution images for comparison
         for i in range(r):
             fig = plt.figure()
             plt.imshow(imgs_lr[i])
-            fig.savefig('images/%s/%d_lowres%d.png' % (self.dataset_name, epoch, i))
+            fig.savefig('/Keras-GAN/srgan/images/%s/%d_lowres%d.png' % (self.dataset_name, epoch, i))
             plt.close()
 
 if __name__ == '__main__':
