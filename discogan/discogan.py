@@ -238,7 +238,7 @@ class DiscoGAN():
                 axs[i, j].set_title(titles[j])
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("/Keras-GAN/discogan/images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
+        fig.savefig("Keras-GAN/discogan/images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
         plt.close()
 
 

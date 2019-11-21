@@ -222,14 +222,14 @@ class CCGAN():
             axs[1,i].axis('off')
             axs[2,i].imshow(gen_imgs[i, :, :, 0], cmap='gray')
             axs[2,i].axis('off')
-        fig.savefig("/Keras-GAN/ccgan/images/%d.png" % epoch)
+        fig.savefig("Keras-GAN/ccgan/images/%d.png" % epoch)
         plt.close()
 
     def save_model(self):
 
         def save(model, model_name):
-            model_path = "/Keras-GAN/ccgan/saved_model/%s.json" % model_name
-            weights_path = "/Keras-GAN/ccgan/saved_model/%s_weights.hdf5" % model_name
+            model_path = "Keras-GAN/ccgan/saved_model/%s.json" % model_name
+            weights_path = "Keras-GAN/ccgan/saved_model/%s_weights.hdf5" % model_name
             options = {"file_arch": model_path,
                         "file_weight": weights_path}
             json_string = model.to_json()

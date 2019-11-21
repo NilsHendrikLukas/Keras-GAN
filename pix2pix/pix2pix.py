@@ -186,7 +186,7 @@ class Pix2Pix():
                     self.sample_images(epoch, batch_i)
 
     def sample_images(self, epoch, batch_i):
-        os.makedirs('/Keras-GAN/pix2pix/images/%s' % self.dataset_name, exist_ok=True)
+        os.makedirs('Keras-GAN/pix2pix/images/%s' % self.dataset_name, exist_ok=True)
         r, c = 3, 3
 
         imgs_A, imgs_B = self.data_loader.load_data(batch_size=3, is_testing=True)
@@ -206,7 +206,7 @@ class Pix2Pix():
                 axs[i, j].set_title(titles[i])
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("/Keras-GAN/pix2pix/images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
+        fig.savefig("Keras-GAN/pix2pix/images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
         plt.close()
 
 

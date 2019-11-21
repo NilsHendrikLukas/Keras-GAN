@@ -25,7 +25,7 @@ class DataLoader():
 
         print ("Setting up MNIST...")
 
-        if not os.path.exists('/Keras-GAN/pixelda/datasets/mnist_x.npy'):
+        if not os.path.exists('Keras-GAN/pixelda/datasets/mnist_x.npy'):
             # Load the dataset
             (mnist_X, mnist_y), (_, _) = mnist.load_data()
 
@@ -38,11 +38,11 @@ class DataLoader():
             self.mnist_X, self.mnist_y = mnist_X, mnist_y
 
             # Save formatted images
-            np.save('/Keras-GAN/pixelda/datasets/mnist_x.npy', self.mnist_X)
-            np.save('/Keras-GAN/pixelda/datasets/mnist_y.npy', self.mnist_y)
+            np.save('Keras-GAN/pixelda/datasets/mnist_x.npy', self.mnist_X)
+            np.save('Keras-GAN/pixelda/datasets/mnist_y.npy', self.mnist_y)
         else:
-            self.mnist_X = np.load('/Keras-GAN/pixelda/datasets/mnist_x.npy')
-            self.mnist_y = np.load('/Keras-GAN/pixelda/datasets/mnist_y.npy')
+            self.mnist_X = np.load('Keras-GAN/pixelda/datasets/mnist_x.npy')
+            self.mnist_y = np.load('Keras-GAN/pixelda/datasets/mnist_y.npy')
 
         print ("+ Done.")
 
@@ -50,10 +50,10 @@ class DataLoader():
 
         print ("Setting up MNIST-M...")
 
-        if not os.path.exists('/Keras-GAN/pixelda/datasets/mnistm_x.npy'):
+        if not os.path.exists('Keras-GAN/pixelda/datasets/mnistm_x.npy'):
 
             # Download the MNIST-M pkl file
-            filepath = '/Keras-GAN/pixelda/datasets/keras_mnistm.pkl.gz'
+            filepath = 'Keras-GAN/pixelda/datasets/keras_mnistm.pkl.gz'
             if not os.path.exists(filepath.replace('.gz', '')):
                 print('+ Downloading ' + self.mnistm_url)
                 data = urllib.request.urlopen(self.mnistm_url)
@@ -65,7 +65,7 @@ class DataLoader():
                 os.unlink(filepath)
 
             # load MNIST-M images from pkl file
-            with open('/Keras-GAN/pixelda/datasets/keras_mnistm.pkl', "rb") as f:
+            with open('Keras-GAN/pixelda/datasets/keras_mnistm.pkl', "rb") as f:
                 data = pickle.load(f, encoding='bytes')
 
             # Normalize and rescale images
@@ -76,11 +76,11 @@ class DataLoader():
             self.mnistm_X, self.mnistm_y = mnistm_X, self.mnist_y.copy()
 
             # Save formatted images
-            np.save('/Keras-GAN/pixelda/datasets/mnistm_x.npy', self.mnistm_X)
-            np.save('/Keras-GAN/pixelda/datasets/mnistm_y.npy', self.mnistm_y)
+            np.save('Keras-GAN/pixelda/datasets/mnistm_x.npy', self.mnistm_X)
+            np.save('Keras-GAN/pixelda/datasets/mnistm_y.npy', self.mnistm_y)
         else:
-            self.mnistm_X = np.load('/Keras-GAN/pixelda/datasets/mnistm_x.npy')
-            self.mnistm_y = np.load('/Keras-GAN/pixelda/datasets/mnistm_y.npy')
+            self.mnistm_X = np.load('Keras-GAN/pixelda/datasets/mnistm_x.npy')
+            self.mnistm_y = np.load('Keras-GAN/pixelda/datasets/mnistm_y.npy')
 
         print ("+ Done.")
 

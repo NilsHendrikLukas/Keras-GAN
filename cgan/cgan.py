@@ -176,7 +176,7 @@ class CGAN():
                 axs[i,j].set_title("Digit: %d" % sampled_labels[cnt])
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("/Keras-GAN/cgan/images/%d.png" % epoch)
+        fig.savefig("Keras-GAN/cgan/images/%d.png" % epoch)
         plt.close()
 
 

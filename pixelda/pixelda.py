@@ -236,7 +236,7 @@ class PixelDA():
                 #axs[i, j].set_title(titles[i])
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("/Keras-GAN/pixelda/images/%d.png" % (epoch))
+        fig.savefig("Keras-GAN/pixelda/images/%d.png" % (epoch))
         plt.close()
 
 
