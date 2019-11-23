@@ -1,6 +1,6 @@
 from __future__ import print_function, division
 
-from keras.datasets import mnist
+from emnist import extract_training_samples
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, multiply
 from keras.layers import BatchNormalization, Activation, Embedding, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -122,7 +122,8 @@ class ACGAN():
     def train(self, epochs, batch_size=128, sample_interval=50):
 
         # Load the dataset
-        (X_train, y_train), (_, _) = mnist.load_data()
+        (X_train, y_train) = extract_training_samples('digits').load_data()
+        (X_train, y_train), (X_test, y_test) = (X_train[:60000], y_train[:60000]), (X_train[60000:70000], y_train[:60000:70000])
 
         # Configure inputs
         X_train = (X_train.astype(np.float32) - 127.5) / 127.5
@@ -193,6 +194,7 @@ class ACGAN():
                 cnt += 1
         fig.savefig("Keras-GAN/acgan/images/%d.png" % epoch)
         plt.close()
+        return gen_imgs
 
     def load_model(self):
 
