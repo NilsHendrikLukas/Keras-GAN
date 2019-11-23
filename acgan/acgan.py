@@ -122,7 +122,7 @@ class ACGAN():
     def train(self, epochs, batch_size=128, sample_interval=50):
 
         # Load the dataset
-        (X_train, y_train) = extract_training_samples('digits').load_data()
+        (X_train, y_train) = extract_training_samples('digits')
         (X_train, y_train), (X_test, y_test) = (X_train[:60000], y_train[:60000]), (X_train[60000:70000], y_train[:60000:70000])
 
         # Configure inputs
