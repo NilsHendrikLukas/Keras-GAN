@@ -4,7 +4,6 @@
 */*.png
 *.json
 *.h5
-*.hdf5
 .DS_Store
 */datasets
 
