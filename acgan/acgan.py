@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class ACGAN():
-    def __init__(self):
+    def __init__(self, load_model=False):
         # Input shape
         self.img_rows = 28
         self.img_cols = 28
@@ -33,6 +33,9 @@ class ACGAN():
 
         # Build the generator
         self.generator = self.build_generator()
+
+        if load_model:
+            self.load_model()
 
         # The generator takes noise and the target label as input
         # and generates the corresponding digit of that label
@@ -190,6 +193,21 @@ class ACGAN():
                 cnt += 1
         fig.savefig("Keras-GAN/acgan/images/%d.png" % epoch)
         plt.close()
+
+    def load_model(self):
+
+        def load(model, model_name):
+            weights_path = "Keras-GAN/acgan/saved_model/%s_weights.hdf5" % model_name
+            options = {"file_weight": weights_path}
+            model.load_weights(options['file_weight'])
+        try:
+            load(self.generator, "generator")
+        except:
+            print("Could not load generator!")
+        try:
+            load(self.discriminator, "discriminator")
+        except:
+            print("Could not load discriminator!")
 
     def save_model(self):
 
