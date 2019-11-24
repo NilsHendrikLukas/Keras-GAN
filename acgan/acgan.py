@@ -65,6 +65,7 @@ class ACGAN():
             optimizer=optimizer)
 
         self.logit_discriminator = None
+        self.gan_discriminator = None
 
     def build_generator(self):
 
@@ -131,13 +132,22 @@ class ACGAN():
 
         return Model(img, [validity, label])
 
+    def get_gan_discriminator(self):
+        if self.gan_discriminator is None:
+            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            new_logits = Dense(1)(feature_maps)
+            self.gan_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.gan_discriminator.name = "logit_discriminator"
+        self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
+        return self.gan_discriminator
+
     def get_logit_discriminator(self):
         if self.logit_discriminator is None:
             feature_maps = self.discriminator.layers[-3].layers[-1].output
-            new_logits = Dense(1)(feature_maps)
+            new_logits = Dense(10)(feature_maps)
             self.logit_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
             self.logit_discriminator.name = "logit_discriminator"
-        self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
+        self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-1].get_weights())
         return self.logit_discriminator
 
     def logan_mia(self,
@@ -151,8 +161,14 @@ class ACGAN():
         """
         x_in, x_out = np.reshape(x_in, (-1, 28, 28, 1)), np.reshape(x_out, (-1, 28, 28, 1))
 
+        """gan_disc_model = self.get_gan_discriminator()
+        y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
+        """
         logit_model = self.get_logit_discriminator()
-        y_pred_in, y_pred_out = np.abs(logit_model.predict(x_in)), np.abs(logit_model.predict(x_out))
+        y_pred_in, y_pred_out = np.abs(np.mean(logit_model.predict(x_in), axis=1)), np.abs(np.mean(logit_model.predict(x_out), axis=1))
+
+        print(y_pred_in.mean())
+        print(y_pred_out.mean())
 
         # Get the accuracy for both approaches
         x = np.linspace(0, 10, 100)
