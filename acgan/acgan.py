@@ -186,7 +186,7 @@ class ACGAN():
 
         def train_discriminator(y_pred_in, y_pred_out, validation_data):
             model = Sequential()
-            model.name = "discriminator"
+            model.name = "featuremap_mia"
 
             model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
             model.add(Dropout(0.2))
