@@ -12,7 +12,7 @@ from keras.optimizers import Adam
 import datetime
 import matplotlib.pyplot as plt
 import sys
-from data_loader import DataLoader
+from discogan.data_loader import DataLoader
 import numpy as np
 import os
 
