@@ -19,6 +19,8 @@ class ACGAN():
                  n_samples=50000,
                  linspace_triplets_logan=(0, 200, 300),
                  log_logan_mia=False,
+                 featuremap_mia_epochs=100,
+                 log_featuremap_mia=False,
                  linspace_triplets_dist=(1800, 2300, 1000),
                  log_dist_mia=False,
                  load_model=False):
@@ -31,6 +33,8 @@ class ACGAN():
         self.latent_dim = 100
         self.log_logan_mia = log_logan_mia
         self.log_dist_mia = log_dist_mia
+        self.featuremap_mia_epochs=featuremap_mia_epochs
+        self.log_featuremap_mia=log_featuremap_mia
         self.n_samples = n_samples
         self.linspace_triplets_logan = linspace_triplets_logan
         self.linspace_triplets_dist = linspace_triplets_dist
@@ -72,6 +76,7 @@ class ACGAN():
 
         self.logit_discriminator = None
         self.gan_discriminator = None
+        self.featuremap_discriminator = None
 
     def build_generator(self):
 
@@ -156,6 +161,86 @@ class ACGAN():
         self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-1].get_weights())
         return self.logit_discriminator
 
+    def get_featuremap_discriminator(self):
+        if self.featuremap_discriminator is None:
+            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            print("FeatureMaps Layer: {}".format(feature_maps))
+            self.featuremap_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[feature_maps])
+            self.featuremap_discriminator.name = "logit_discriminator"
+        return self.featuremap_discriminator
+
+    def featuremap_mia(self,
+                x_in,
+                x_out,
+                plot_graph=False):
+        """
+        Take 50% of the training data and feed it through the neural network
+        """
+        x_in, x_out = np.reshape(x_in, (-1, 28, 28, 1)), np.reshape(x_out, (-1, 28, 28, 1))
+
+        # gan_disc_model = self.get_gan_discriminator()
+        # y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
+
+        self.featuremap_discriminator = self.get_featuremap_discriminator()
+        y_pred_in, y_pred_out = self.featuremap_discriminator.predict(x_in), self.featuremap_discriminator.predict(x_out)
+
+        def train_discriminator(y_pred_in, y_pred_out, validation_data):
+            model = Sequential()
+            model.name = "discriminator"
+
+            model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
+            model.add(Dense(units=250))
+            model.add(Dense(units=10))
+            model.add(Dense(units=1, activation="sigmoid"))
+
+            model.compile(optimizer="Adam",
+                          metrics=["accuracy"],
+                          loss="binary_crossentropy")
+
+            model.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
+                    np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
+                    validation_data=validation_data,
+                    epochs=self.featuremap_mia_epochs,
+                    verbose=1)
+            return model
+
+        n = int(len(y_pred_in)/2)
+        val_data = (np.concatenate((y_pred_in[n:], y_pred_out[n:]), axis=0),
+                    np.concatenate((np.zeros(len(y_pred_in[n:])), np.ones(len(y_pred_out[n:])))))
+        c_disc = train_discriminator(y_pred_in[:n], y_pred_out[:n],val_data)
+        y_pred_in = c_disc.predict(y_pred_in[n:])
+        y_pred_out = c_disc.predict(y_pred_out[n:])
+
+        # Get the accuracy for both approaches
+        x = np.linspace(0,1,100)
+        y_acc = []  # Total accuracy per threshold
+        y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
+        for thresh in x:
+            accuracy_in = np.where(y_pred_in >= thresh)[0]  # Correctly captured
+            accuracy_out = np.where(y_pred_out < thresh)[0]  # Correctly captured
+            selected_samples = np.where((np.concatenate((y_pred_in, y_pred_out), axis=0) >= thresh))[0]
+
+            total_acc = (len(accuracy_in) + len(accuracy_out)) / (len(y_pred_in) + len(y_pred_out))
+            total_samples = len(selected_samples) / (len(y_pred_in) + len(y_pred_out))
+
+            y_acc.append(total_acc)
+            y_sel.append(total_samples)
+
+        max_acc = max(y_acc)
+        print("Maximum Accuracy: {}".format(max_acc))
+
+        if plot_graph:
+            plt.title("[LOGAN] Membership Inference Accuracy")
+            plt.xlabel("Threshold")
+            plt.ylabel("Ratio")
+            plt.plot(x, y_acc, label="Membership Inference Accuracy")
+            plt.plot(x, y_sel, label="Positive samples")
+            plt.legend()
+            plt.show()
+
+        return max_acc
+
+
     def distance_mia(self,
                 x_in,
                 x_out,
@@ -214,7 +299,6 @@ class ACGAN():
             plt.show()
 
         return max_acc
-
 
     def logan_mia(self,
                   x_in,
@@ -328,6 +412,13 @@ class ACGAN():
                     self.execute_logan_mia()
                 if self.log_dist_mia:
                     self.execute_dist_mia()
+                if self.log_featuremap_mia:
+                    self.execute_featuremap_mia()
+
+    def execute_featuremap_mia(self):
+        n = min(self.n_samples, 5000)
+        x_in, x_out = self.X_train[0:n], self.X_train[100000:100000 + n]
+        max_acc = self.featuremap_mia(x_in, x_out)
 
     def execute_dist_mia(self):
         n = min(self.n_samples, 1000)
@@ -397,5 +488,6 @@ if __name__ == '__main__':
     acgan = ACGAN(linspace_triplets_logan= (2000, 2100, 5000))
     acgan.load_model()
 
-    x_in, x_out = X_train[0:1000], X_train[100000:101000]
-    acgan.distance_mia(x_in, x_out, plot_graph=True)
+    n = 5000
+    x_in, x_out = X_train[0:n], X_train[100000:100000+n]
+    acgan.featuremap_mia(x_in, x_out, plot_graph=True)
