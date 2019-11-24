@@ -2,6 +2,8 @@ import scipy
 from glob import glob
 import numpy as np
 
+import imageio
+
 class DataLoader():
     def __init__(self, dataset_name, img_res=(128, 128)):
         self.dataset_name = dataset_name
@@ -74,4 +76,4 @@ class DataLoader():
         return img[np.newaxis, :, :, :]
 
     def imread(self, path):
-        return scipy.misc.imread(path, mode='RGB').astype(np.float)
+        return imageio.imread(path, mode='RGB').astype(np.float)
