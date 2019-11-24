@@ -17,8 +17,9 @@ import numpy as np
 class ACGAN():
     def __init__(self,
                  n_samples=50000,
-                 linspace_triplets=(0, 200, 300),
-                 log_mia=False,
+                 linspace_triplets_logan=(0, 200, 300),
+                 log_logan_mia=False,
+                 linspace_triplets_dist=(1800, 2300, 1000),
                  log_dist_mia=False,
                  load_model=False):
         # Input shape
@@ -28,10 +29,11 @@ class ACGAN():
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.num_classes = 10
         self.latent_dim = 100
-        self.log_mia = log_mia
+        self.log_logan_mia = log_logan_mia
         self.log_dist_mia = log_dist_mia
         self.n_samples = n_samples
-        self.linspace_triplets = linspace_triplets
+        self.linspace_triplets_logan = linspace_triplets_logan
+        self.linspace_triplets_dist = linspace_triplets_dist
         self.X_train, self.y_train = extract_training_samples('digits')
 
         optimizer = Adam(0.0002, 0.5)
@@ -185,7 +187,7 @@ class ACGAN():
         print("Mean Dist out: {}".format(np.mean(x_dist_out)))
 
         # Get the accuracy for both approaches
-        x = np.linspace(*self.linspace_triplets)
+        x = np.linspace(*self.linspace_triplets_dist)
         y_acc = []  # Total accuracy per threshold
         y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
         for thresh in x:
@@ -235,7 +237,7 @@ class ACGAN():
         print(y_pred_out.mean())
 
         # Get the accuracy for both approaches
-        x = np.linspace(*self.linspace_triplets)
+        x = np.linspace(*self.linspace_triplets_logan)
         y_acc = [] # Total accuracy per threshold
         y_sel = [] # Ratio of dataset that has a confidence score greater than threshold
         for thresh in x:
@@ -322,7 +324,7 @@ class ACGAN():
             if epoch % sample_interval == 0:
                 self.save_model()
                 self.sample_images(epoch)
-                if self.log_mia:
+                if self.log_logan_mia:
                     self.execute_logan_mia()
                 if self.log_dist_mia:
                     self.execute_dist_mia()
@@ -392,7 +394,7 @@ class ACGAN():
 if __name__ == '__main__':
     (X_train, y_train) = extract_training_samples('digits')
 
-    acgan = ACGAN(linspace_triplets = (2000, 2100, 5000))
+    acgan = ACGAN(linspace_triplets_logan= (2000, 2100, 5000))
     acgan.load_model()
 
     x_in, x_out = X_train[0:1000], X_train[100000:101000]
