@@ -244,7 +244,7 @@ class ACGAN():
 
     def execute_logan_mia(self):
         x_in, x_out = self.X_train[0:1000], self.X_train[100000:101000]
-        max_acc = acgan.logan_mia(x_in, x_out)
+        max_acc = self.logan_mia(x_in, x_out)
 
         with open('Keras-GAN/acgan/logs/"logan_mia.csv', mode='a') as file_:
             file_.write("{}".format(max_acc))
