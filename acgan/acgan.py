@@ -12,8 +12,6 @@ from keras.optimizers import Adam
 
 import matplotlib.pyplot as plt
 
-from skimage.metrics import structural_similarity as ssim
-
 import numpy as np
 
 class ACGAN():
@@ -177,7 +175,6 @@ class ACGAN():
                 min_distance = np.inf
                 for gen_img in gen_imgs:
                     dist = np.linalg.norm(suspect_img-np.reshape(gen_img, (28, 28)), ord=2)
-                    dist = ssim(suspect_img, gen_img)
                     if dist < min_distance:
                         min_distance = dist
                 distances.append(min_distance)
