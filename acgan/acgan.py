@@ -253,7 +253,8 @@ class ACGAN():
             g_loss = self.combined.train_on_batch([noise, sampled_labels], [valid, sampled_labels])
 
             # Plot the progress
-            print ("%d [D loss: %f, acc.: %.2f%%, op_acc: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[3], 100*d_loss[4], g_loss[0]), end="\r")
+            print("%d [D loss: %f, acc.: %.2f%%, op_acc: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[3], 100*d_loss[4], g_loss[0]),
+                   end="\r")
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
@@ -263,7 +264,8 @@ class ACGAN():
                     self.execute_logan_mia()
 
     def execute_logan_mia(self):
-        x_in, x_out = self.X_train[0:1000], self.X_train[100000:101000]
+        n = min(self.n_samples, 1000)
+        x_in, x_out = self.X_train[0:n], self.X_train[100000:100000+n]
         max_acc = self.logan_mia(x_in, x_out)
 
         with open('Keras-GAN/acgan/logs/"logan_mia.csv', mode='a') as file_:
