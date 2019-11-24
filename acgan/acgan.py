@@ -16,6 +16,7 @@ import numpy as np
 
 class ACGAN():
     def __init__(self,
+                 n_samples=50000,
                  log_mia=False,
                  load_model=False):
         # Input shape
@@ -26,6 +27,7 @@ class ACGAN():
         self.num_classes = 10
         self.latent_dim = 100
         self.log_mia = log_mia
+        self.n_samples = n_samples
         self.X_train, self.y_train = extract_training_samples('digits')
 
         optimizer = Adam(0.0002, 0.5)
@@ -186,7 +188,7 @@ class ACGAN():
         # Load the dataset
         if self.X_train is None:
             self.X_train, self.y_train = extract_training_samples('digits')
-        X_train, y_train = self.X_train[:50000], self.y_train[:50000]
+        X_train, y_train = self.X_train[:self.n_samples], self.y_train[:self.n_samples]
 
         # Configure inputs
         X_train = (X_train.astype(np.float32) - 127.5) / 127.5
@@ -300,5 +302,5 @@ if __name__ == '__main__':
     acgan = ACGAN()
     acgan.load_model()
 
-    x_in, x_out = X_train[0:1000], X_train[100000:111000]
+    x_in, x_out = X_train[0:1000], X_train[100000:101000]
     acgan.logan_mia(x_in, x_out)
