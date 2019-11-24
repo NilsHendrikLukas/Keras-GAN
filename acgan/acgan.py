@@ -189,7 +189,9 @@ class ACGAN():
             model.name = "discriminator"
 
             model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
+            model.add(Dropout(0.2))
             model.add(Dense(units=250))
+            model.add(Dropout(0.2))
             model.add(Dense(units=10))
             model.add(Dense(units=1, activation="sigmoid"))
 
@@ -207,12 +209,12 @@ class ACGAN():
         n = int(len(y_pred_in)/2)
         val_data = (np.concatenate((y_pred_in[n:], y_pred_out[n:]), axis=0),
                     np.concatenate((np.zeros(len(y_pred_in[n:])), np.ones(len(y_pred_out[n:])))))
-        c_disc = train_discriminator(y_pred_in[:n], y_pred_out[:n],val_data)
+        c_disc = train_discriminator(y_pred_in[:n], y_pred_out[:n], val_data)
         y_pred_in = c_disc.predict(y_pred_in[n:])
         y_pred_out = c_disc.predict(y_pred_out[n:])
 
         # Get the accuracy for both approaches
-        x = np.linspace(0,1,100)
+        x = np.linspace(0,1, 100)
         y_acc = []  # Total accuracy per threshold
         y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
         for thresh in x:
@@ -416,7 +418,7 @@ class ACGAN():
                     self.execute_featuremap_mia()
 
     def execute_featuremap_mia(self):
-        n = min(self.n_samples, 5000)
+        n = min(self.n_samples, 1000)
         x_in, x_out = self.X_train[0:n], self.X_train[100000:100000 + n]
         max_acc = self.featuremap_mia(x_in, x_out)
 
@@ -488,6 +490,6 @@ if __name__ == '__main__':
     acgan = ACGAN(linspace_triplets_logan= (2000, 2100, 5000))
     acgan.load_model()
 
-    n = 5000
+    n = 500
     x_in, x_out = X_train[0:n], X_train[100000:100000+n]
     acgan.featuremap_mia(x_in, x_out, plot_graph=True)
