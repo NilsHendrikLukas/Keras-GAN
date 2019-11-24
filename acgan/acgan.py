@@ -165,7 +165,7 @@ class ACGAN():
         y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
         """
         logit_model = self.get_logit_discriminator()
-        y_pred_in, y_pred_out = np.abs(np.mean(logit_model.predict(x_in), axis=1)), np.abs(np.mean(logit_model.predict(x_out), axis=1))
+        y_pred_in, y_pred_out = np.max(logit_model.predict(x_in), axis=1), np.max(logit_model.predict(x_out), axis=1)
 
         print(y_pred_in.mean())
         print(y_pred_out.mean())
