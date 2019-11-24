@@ -1,6 +1,8 @@
 from __future__ import print_function, division
 
 from emnist import extract_training_samples
+from keras import activations
+from keras.engine.saving import load_model
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, multiply
 from keras.layers import BatchNormalization, Activation, Embedding, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -13,7 +15,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class ACGAN():
-    def __init__(self, load_model=False):
+    def __init__(self,
+                 log_mia=False,
+                 load_model=False):
         # Input shape
         self.img_rows = 28
         self.img_cols = 28
@@ -21,6 +25,8 @@ class ACGAN():
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.num_classes = 10
         self.latent_dim = 100
+        self.log_mia = log_mia
+        self.X_train, self.y_train = extract_training_samples('digits')
 
         optimizer = Adam(0.0002, 0.5)
         losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
@@ -56,9 +62,12 @@ class ACGAN():
         self.combined.compile(loss=losses,
             optimizer=optimizer)
 
+        self.logit_discriminator = None
+
     def build_generator(self):
 
         model = Sequential()
+        model.name="generator"
 
         model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
         model.add(Reshape((7, 7, 128)))
@@ -88,6 +97,7 @@ class ACGAN():
     def build_discriminator(self):
 
         model = Sequential()
+        model.name = "discriminator"
 
         model.add(Conv2D(16, kernel_size=3, strides=2, input_shape=self.img_shape, padding="same"))
         model.add(LeakyReLU(alpha=0.2))
@@ -114,16 +124,69 @@ class ACGAN():
         features = model(img)
 
         # Determine validity and label of the image
-        validity = Dense(1, activation="sigmoid")(features)
-        label = Dense(self.num_classes, activation="softmax")(features)
+        validity = Dense(1, activation="sigmoid", name="logits")(features)
+        label = Dense(self.num_classes, activation="softmax", name="softmax")(features)
 
         return Model(img, [validity, label])
+
+    def get_logit_discriminator(self):
+        if self.logit_discriminator is None:
+            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            new_logits = Dense(1)(feature_maps)
+            self.logit_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.logit_discriminator.name = "logit_discriminator"
+        self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
+        return self.logit_discriminator
+
+    def logan_mia(self,
+                  x_in,
+                  x_out,
+                  plot_graph=False):
+        """
+        Membership inference attack with the LOGAN paper
+        @:param x_in The images in the dataset
+        @:param x_out The images out of the dataset
+        """
+        x_in, x_out = np.reshape(x_in, (-1, 28, 28, 1)), np.reshape(x_out, (-1, 28, 28, 1))
+
+        logit_model = self.get_logit_discriminator()
+        y_pred_in, y_pred_out = np.abs(logit_model.predict(x_in)), np.abs(logit_model.predict(x_out))
+
+        # Get the accuracy for both approaches
+        x = np.linspace(0, 10, 100)
+        y_acc = [] # Total accuracy per threshold
+        y_sel = [] # Ratio of dataset that has a confidence score greater than threshold
+        for thresh in x:
+            accuracy_in = np.where(y_pred_in >= thresh)[0]   # Correctly captured
+            accuracy_out = np.where(y_pred_out < thresh)[0]  # Correctly captured
+            selected_samples = np.where((np.concatenate((y_pred_in, y_pred_out), axis=0) >= thresh))[0]
+
+            total_acc = (len(accuracy_in)+len(accuracy_out))/(len(y_pred_in) + len(y_pred_out))
+            total_samples = len(selected_samples)/(len(y_pred_in) + len(y_pred_out))
+
+            y_acc.append(total_acc)
+            y_sel.append(total_samples)
+
+        max_acc = max(y_acc)
+        print("Maximum Accuracy: {}".format(max_acc))
+
+        if plot_graph:
+            plt.title("Membership Inference Accuracy")
+            plt.xlabel("Threshold")
+            plt.ylabel("Ratio")
+            plt.plot(x, y_acc, label="Membership Inference Accuracy")
+            plt.plot(x, y_sel, label="Positive samples")
+            plt.legend()
+            plt.show()
+
+        return max_acc
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
         # Load the dataset
-        (X_train, y_train) = extract_training_samples('digits')
-        (X_train, y_train), (X_test, y_test) = (X_train[:60000], y_train[:60000]), (X_train[60000:70000], y_train[:60000:70000])
+        if self.X_train is None:
+            self.X_train, self.y_train = extract_training_samples('digits')
+        X_train, y_train = self.X_train[:50000], self.y_train[:50000]
 
         # Configure inputs
         X_train = (X_train.astype(np.float32) - 127.5) / 127.5
@@ -176,6 +239,16 @@ class ACGAN():
             if epoch % sample_interval == 0:
                 self.save_model()
                 self.sample_images(epoch)
+                if self.log_mia:
+                    self.execute_logan_mia()
+
+    def execute_logan_mia(self):
+        x_in, x_out = self.X_train[0:1000], self.X_train[100000:101000]
+        max_acc = acgan.logan_mia(x_in, x_out)
+
+        with open('Keras-GAN/acgan/logs/"logan_mia.csv', mode='a') as file_:
+            file_.write("{}".format(max_acc))
+            file_.write("\n")
 
     def sample_images(self, epoch):
         r, c = 10, 10
@@ -202,14 +275,9 @@ class ACGAN():
             weights_path = "Keras-GAN/acgan/saved_model/%s_weights.hdf5" % model_name
             options = {"file_weight": weights_path}
             model.load_weights(options['file_weight'])
-        try:
-            load(self.generator, "generator")
-        except:
-            print("Could not load generator!")
-        try:
-            load(self.discriminator, "discriminator")
-        except:
-            print("Could not load discriminator!")
+
+        load(self.generator, "generator")
+        load(self.discriminator, "discriminator")
 
     def save_model(self):
 
@@ -227,5 +295,10 @@ class ACGAN():
 
 
 if __name__ == '__main__':
+    (X_train, y_train) = extract_training_samples('digits')
+
     acgan = ACGAN()
-    acgan.train(epochs=14000, batch_size=32, sample_interval=200)
+    acgan.load_model()
+
+    x_in, x_out = X_train[0:1000], X_train[100000:111000]
+    acgan.logan_mia(x_in, x_out)
