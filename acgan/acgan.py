@@ -171,7 +171,7 @@ class ACGAN():
         print(y_pred_out.mean())
 
         # Get the accuracy for both approaches
-        x = np.linspace(0, 10, 100)
+        x = np.linspace(0, 30, 300)
         y_acc = [] # Total accuracy per threshold
         y_sel = [] # Ratio of dataset that has a confidence score greater than threshold
         for thresh in x:
