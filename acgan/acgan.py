@@ -17,6 +17,7 @@ import numpy as np
 class ACGAN():
     def __init__(self,
                  n_samples=50000,
+                 linspace_triplets=(0, 200, 300),
                  log_mia=False,
                  load_model=False):
         # Input shape
@@ -28,6 +29,7 @@ class ACGAN():
         self.latent_dim = 100
         self.log_mia = log_mia
         self.n_samples = n_samples
+        self.linspace_triplets = linspace_triplets
         self.X_train, self.y_train = extract_training_samples('digits')
 
         optimizer = Adam(0.0002, 0.5)
@@ -161,9 +163,9 @@ class ACGAN():
         """
         x_in, x_out = np.reshape(x_in, (-1, 28, 28, 1)), np.reshape(x_out, (-1, 28, 28, 1))
 
-        """gan_disc_model = self.get_gan_discriminator()
-        y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
-        """
+        #gan_disc_model = self.get_gan_discriminator()
+        #y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
+
         logit_model = self.get_logit_discriminator()
         y_pred_in, y_pred_out = np.max(logit_model.predict(x_in), axis=1), np.max(logit_model.predict(x_out), axis=1)
 
@@ -171,7 +173,7 @@ class ACGAN():
         print(y_pred_out.mean())
 
         # Get the accuracy for both approaches
-        x = np.linspace(0, 30, 300)
+        x = np.linspace(*self.linspace_triplets)
         y_acc = [] # Total accuracy per threshold
         y_sel = [] # Ratio of dataset that has a confidence score greater than threshold
         for thresh in x:
@@ -315,8 +317,8 @@ class ACGAN():
 if __name__ == '__main__':
     (X_train, y_train) = extract_training_samples('digits')
 
-    acgan = ACGAN()
+    acgan = ACGAN(linspace_triplets = (0, 200, 5000))
     acgan.load_model()
 
     x_in, x_out = X_train[0:1000], X_train[100000:101000]
-    acgan.logan_mia(x_in, x_out)
+    acgan.logan_mia(x_in, x_out, plot_graph=True)
