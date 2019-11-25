@@ -133,9 +133,9 @@ class DCGAN():
         # Load the dataset
         (X_train, _), (X_test, _) = cifar10.load_data()
 
-        # Rescale -1 to 1
-        X_train = X_train / 255
-        X_test = X_test / 255
+        # Rescale 0 to 1
+        X_train = X_train / 255.
+        X_test = X_test / 255.
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
