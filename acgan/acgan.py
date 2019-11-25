@@ -203,11 +203,11 @@ class ACGAN():
                               metrics=["accuracy"],
                               loss="binary_crossentropy")
                 self.featuremap_attacker = model
-                self.featuremap_attacker.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
-                    np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
-                    validation_data=validation_data,
-                    epochs=self.featuremap_mia_epochs,
-                    verbose=1)
+            self.featuremap_attacker.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
+                np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
+                validation_data=validation_data,
+                epochs=self.featuremap_mia_epochs,
+                verbose=1)
             return self.featuremap_attacker
 
         n = int(len(y_pred_in)/2)
