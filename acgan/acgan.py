@@ -188,20 +188,19 @@ class ACGAN():
 
         def train_discriminator(y_pred_in, y_pred_out, validation_data):
             if self.featuremap_discriminator is None:
-                model = Sequential()
-                model.name = "featuremap_mia"
+                self.featuremap_discriminator = Sequential()
+                self.featuremap_discriminator.name = "featuremap_mia"
 
-                model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
-                model.add(Dropout(0.2))
-                model.add(Dense(units=250))
-                model.add(Dropout(0.2))
-                model.add(Dense(units=10))
-                model.add(Dense(units=1, activation="sigmoid"))
+                self.featuremap_discriminator.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
+                self.featuremap_discriminator.add(Dropout(0.2))
+                self.featuremap_discriminator.add(Dense(units=250))
+                self.featuremap_discriminator.add(Dropout(0.2))
+                self.featuremap_discriminator.add(Dense(units=10))
+                self.featuremap_discriminator.add(Dense(units=1, activation="sigmoid"))
 
-                model.compile(optimizer="Adam",
+                self.featuremap_discriminator.compile(optimizer="Adam",
                               metrics=["accuracy"],
                               loss="binary_crossentropy")
-                self.featuremap_discriminator = model
 
             self.featuremap_discriminator.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
                     np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
