@@ -360,10 +360,10 @@ class ACGAN():
         # Load the dataset
         if self.X_train is None:
             self.X_train, self.y_train = extract_training_samples('digits')
+            self.X_train = (self.X_train.astype(np.float32) - 127.5) / 127.5
         X_train, y_train = self.X_train[:self.n_samples], self.y_train[:self.n_samples]
 
         # Configure inputs
-        X_train = (X_train.astype(np.float32) - 127.5) / 127.5
         X_train = np.expand_dims(X_train, axis=3)
         y_train = y_train.reshape(-1, 1)
 
