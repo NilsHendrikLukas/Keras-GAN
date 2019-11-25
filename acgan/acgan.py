@@ -38,7 +38,9 @@ class ACGAN():
         self.n_samples = n_samples
         self.linspace_triplets_logan = linspace_triplets_logan
         self.linspace_triplets_dist = linspace_triplets_dist
+
         self.X_train, self.y_train = extract_training_samples('digits')
+        self.X_train = (self.X_train.astype(np.float32) - 127.5) / 127.5
 
         optimizer = Adam(0.0002, 0.5)
         losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
@@ -229,10 +231,10 @@ class ACGAN():
             y_sel.append(total_samples)
 
         max_acc = max(y_acc)
-        print("Maximum Accuracy: {}".format(max_acc))
+        print("Featuremap Maximum Accuracy: {}".format(max_acc))
 
         if plot_graph:
-            plt.title("[LOGAN] Membership Inference Accuracy")
+            plt.title("[Featuremap] Membership Inference Accuracy")
             plt.xlabel("Threshold")
             plt.ylabel("Ratio")
             plt.plot(x, y_acc, label="Membership Inference Accuracy")
@@ -289,7 +291,7 @@ class ACGAN():
             y_sel.append(total_samples)
 
         max_acc = max(y_acc)
-        print("Maximum Accuracy: {}".format(max_acc))
+        print("Distance Maximum Accuracy: {}".format(max_acc))
 
         if plot_graph:
             plt.title("[Distance] Membership Inference Accuracy")
@@ -338,7 +340,7 @@ class ACGAN():
             y_sel.append(total_samples)
 
         max_acc = max(y_acc)
-        print("Maximum Accuracy: {}".format(max_acc))
+        print("LOGAN Maximum Accuracy: {}".format(max_acc))
 
         if plot_graph:
             plt.title("[LOGAN] Membership Inference Accuracy")
@@ -487,9 +489,14 @@ class ACGAN():
 if __name__ == '__main__':
     (X_train, y_train) = extract_training_samples('digits')
 
-    acgan = ACGAN(linspace_triplets_logan= (2000, 2100, 5000))
+    acgan = ACGAN()
     acgan.load_model()
 
     n = 500
     x_in, x_out = X_train[0:n], X_train[100000:100000+n]
+    x_in = x_in.astype(np.float32)-127.5/127.5
+    x_out = x_out.astype(np.float32) - 127.5 / 127.5
+
     acgan.featuremap_mia(x_in, x_out, plot_graph=True)
+    acgan.distance_mia(x_in, x_out, plot_graph=True)
+    acgan.logan_mia(x_in, x_out, plot_graph=True)
