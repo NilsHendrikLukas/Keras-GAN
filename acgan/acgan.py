@@ -187,26 +187,28 @@ class ACGAN():
         y_pred_in, y_pred_out = self.featuremap_discriminator.predict(x_in), self.featuremap_discriminator.predict(x_out)
 
         def train_discriminator(y_pred_in, y_pred_out, validation_data):
-            model = Sequential()
-            model.name = "featuremap_mia"
+            if self.featuremap_discriminator is None:
+                model = Sequential()
+                model.name = "featuremap_mia"
 
-            model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
-            model.add(Dropout(0.2))
-            model.add(Dense(units=250))
-            model.add(Dropout(0.2))
-            model.add(Dense(units=10))
-            model.add(Dense(units=1, activation="sigmoid"))
+                model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
+                model.add(Dropout(0.2))
+                model.add(Dense(units=250))
+                model.add(Dropout(0.2))
+                model.add(Dense(units=10))
+                model.add(Dense(units=1, activation="sigmoid"))
 
-            model.compile(optimizer="Adam",
-                          metrics=["accuracy"],
-                          loss="binary_crossentropy")
+                model.compile(optimizer="Adam",
+                              metrics=["accuracy"],
+                              loss="binary_crossentropy")
+                self.featuremap_discriminator = model
 
-            model.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
+            self.featuremap_discriminator.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
                     np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
                     validation_data=validation_data,
                     epochs=self.featuremap_mia_epochs,
                     verbose=1)
-            return model
+            return self.featuremap_discriminator
 
         n = int(len(y_pred_in)/2)
         val_data = (np.concatenate((y_pred_in[n:], y_pred_out[n:]), axis=0),
