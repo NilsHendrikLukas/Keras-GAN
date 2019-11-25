@@ -1,10 +1,11 @@
 from __future__ import print_function, division
 
-from keras.datasets import mnist
+from keras import initializers
+from keras.datasets import cifar10
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import UpSampling2D, Conv2D
+from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 
@@ -51,20 +52,34 @@ class DCGAN():
 
     def build_generator(self):
 
+        # Generator network
         model = Sequential()
 
-        model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
-        model.add(Reshape((7, 7, 128)))
-        model.add(UpSampling2D())
-        model.add(Conv2D(128, kernel_size=3, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Activation("relu"))
-        model.add(UpSampling2D())
-        model.add(Conv2D(64, kernel_size=3, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Activation("relu"))
-        model.add(Conv2D(self.channels, kernel_size=3, padding="same"))
-        model.add(Activation("tanh"))
+        init = initializers.RandomNormal(stddev=0.02)
+        # FC: 2x2x512
+        model.add(Dense(2 * 2 * 512, input_shape=(self.latent_dim,), kernel_initializer=init))
+        model.add(Reshape((2, 2, 512)))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # # Conv 1: 4x4x256
+        model.add(Conv2DTranspose(256, kernel_size=5, strides=2, padding='same'))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # Conv 2: 8x8x128
+        model.add(Conv2DTranspose(128, kernel_size=5, strides=2, padding='same'))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # Conv 3: 16x16x64
+        model.add(Conv2DTranspose(64, kernel_size=5, strides=2, padding='same'))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # Conv 4: 32x32x3
+        model.add(Conv2DTranspose(3, kernel_size=5, strides=2, padding='same',
+                                      activation='tanh'))
 
         model.summary()
 
@@ -75,25 +90,35 @@ class DCGAN():
 
     def build_discriminator(self):
 
+        init = initializers.RandomNormal(stddev=0.02)
+
+        # Discriminator network
         model = Sequential()
 
-        model.add(Conv2D(32, kernel_size=3, strides=2, input_shape=self.img_shape, padding="same"))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
-        model.add(Conv2D(64, kernel_size=3, strides=2, padding="same"))
-        model.add(ZeroPadding2D(padding=((0,1),(0,1))))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
-        model.add(Conv2D(128, kernel_size=3, strides=2, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
-        model.add(Conv2D(256, kernel_size=3, strides=1, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        # Conv 1: 16x16x64
+        model.add(Conv2D(64, kernel_size=5, strides=2, padding='same',
+                                 input_shape=(self.img_shape), kernel_initializer=init))
+        model.add(LeakyReLU(0.2))
+
+        # Conv 2:
+        model.add(Conv2D(128, kernel_size=5, strides=2, padding='same'))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # Conv 3:
+        model.add(Conv2D(256, kernel_size=5, strides=2, padding='same'))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # Conv 3:
+        model.add(Conv2D(512, kernel_size=5, strides=2, padding='same'))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(0.2))
+
+        # FC
         model.add(Flatten())
+
+        # Output
         model.add(Dense(1, activation='sigmoid'))
 
         model.summary()
@@ -106,11 +131,10 @@ class DCGAN():
     def train(self, epochs, batch_size=128, save_interval=50):
 
         # Load the dataset
-        (X_train, _), (_, _) = mnist.load_data()
+        (X_train, _), (_, _) = cifar10.load_data()
 
         # Rescale -1 to 1
         X_train = X_train / 127.5 - 1.
-        X_train = np.expand_dims(X_train, axis=3)
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
