@@ -185,13 +185,13 @@ class DCGAN():
         cnt = 0
         for i in range(r):
             for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
+                axs[i,j].imshow(gen_imgs[cnt, :,:,0])
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("Keras-GAN/dcgan/images/mnist_%d.png" % epoch)
+        fig.savefig("Keras-GAN/dcgan/images/cifar_%d.png" % epoch)
         plt.close()
 
 
 if __name__ == '__main__':
     dcgan = DCGAN()
-    dcgan.train(epochs=4000, batch_size=32, save_interval=50)
+    dcgan.train(epochs=12000, batch_size=32, save_interval=50)
