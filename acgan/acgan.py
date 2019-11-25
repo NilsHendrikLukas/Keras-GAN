@@ -84,7 +84,7 @@ class ACGAN():
     def build_generator(self):
 
         model = Sequential()
-        model.name="generator"
+        model.name = "generator"
 
         model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
         model.add(Reshape((7, 7, 128)))
@@ -151,7 +151,7 @@ class ACGAN():
             feature_maps = self.discriminator.layers[-3].layers[-1].output
             new_logits = Dense(1)(feature_maps)
             self.gan_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
-            self.gan_discriminator.name = "logit_discriminator"
+            self.gan_discriminator.name = "gan_discriminator"
         self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
         return self.gan_discriminator
 
@@ -169,7 +169,7 @@ class ACGAN():
             feature_maps = self.discriminator.layers[-3].layers[-1].output
             print("FeatureMaps Layer: {}".format(feature_maps))
             self.featuremap_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[feature_maps])
-            self.featuremap_discriminator.name = "logit_discriminator"
+            self.featuremap_discriminator.name = "featuremap_discriminator"
         return self.featuremap_discriminator
 
     def featuremap_mia(self,
