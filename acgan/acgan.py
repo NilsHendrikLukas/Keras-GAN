@@ -79,6 +79,7 @@ class ACGAN():
         self.logit_discriminator = None
         self.gan_discriminator = None
         self.featuremap_discriminator = None
+        self.featuremap_attacker = None
 
     def build_generator(self):
 
@@ -187,27 +188,27 @@ class ACGAN():
         y_pred_in, y_pred_out = self.featuremap_discriminator.predict(x_in), self.featuremap_discriminator.predict(x_out)
 
         def train_discriminator(y_pred_in, y_pred_out, validation_data):
-            if self.featuremap_discriminator is None:
-                self.featuremap_discriminator = Sequential()
-                self.featuremap_discriminator.name = "featuremap_mia"
+            if self.featuremap_attacker is None:
+                model = Sequential()
+                model.name = "featuremap_mia"
 
-                self.featuremap_discriminator.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
-                self.featuremap_discriminator.add(Dropout(0.2))
-                self.featuremap_discriminator.add(Dense(units=250))
-                self.featuremap_discriminator.add(Dropout(0.2))
-                self.featuremap_discriminator.add(Dense(units=10))
-                self.featuremap_discriminator.add(Dense(units=1, activation="sigmoid"))
+                model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
+                model.add(Dropout(0.2))
+                model.add(Dense(units=250))
+                model.add(Dropout(0.2))
+                model.add(Dense(units=10))
+                model.add(Dense(units=1, activation="sigmoid"))
 
-                self.featuremap_discriminator.compile(optimizer="Adam",
+                model.compile(optimizer="Adam",
                               metrics=["accuracy"],
                               loss="binary_crossentropy")
-
-            self.featuremap_discriminator.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
+                self.featuremap_attacker = model
+                self.featuremap_attacker.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
                     np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
                     validation_data=validation_data,
                     epochs=self.featuremap_mia_epochs,
                     verbose=1)
-            return self.featuremap_discriminator
+            return self.featuremap_attacker
 
         n = int(len(y_pred_in)/2)
         val_data = (np.concatenate((y_pred_in[n:], y_pred_out[n:]), axis=0),
