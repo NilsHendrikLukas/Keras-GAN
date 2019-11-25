@@ -193,14 +193,14 @@ class DCGAN():
         plt.close()
 
 
-  def get_gan_discriminator(self):
-        if self.gan_discriminator is None:
-            feature_maps = self.discriminator.layers[-3].layers[-1].output
-            new_logits = Dense(1)(feature_maps)
-            self.gan_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
-            self.gan_discriminator.name = "gan_discriminator"
-        self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
-        return self.gan_discriminator
+    def get_gan_discriminator(self):
+            if self.gan_discriminator is None:
+                feature_maps = self.discriminator.layers[-3].layers[-1].output
+                new_logits = Dense(1)(feature_maps)
+                self.gan_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
+                self.gan_discriminator.name = "gan_discriminator"
+            self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
+            return self.gan_discriminator
 
     def get_logit_discriminator(self):
         if self.logit_discriminator is None:
@@ -247,8 +247,8 @@ class DCGAN():
                 model.add(Dense(units=1, activation="sigmoid"))
 
                 model.compile(optimizer="Adam",
-                              metrics=["accuracy"],
-                              loss="binary_crossentropy")
+                            metrics=["accuracy"],
+                            loss="binary_crossentropy")
                 self.featuremap_attacker = model
             self.featuremap_attacker.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
                 np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
@@ -354,9 +354,9 @@ class DCGAN():
         return max_acc
 
     def logan_mia(self,
-                  x_in,
-                  x_out,
-                  plot_graph=False):
+                x_in,
+                x_out,
+                plot_graph=False):
         """
         Membership inference attack with the LOGAN paper
         @:param x_in The images in the dataset
@@ -469,7 +469,7 @@ class DCGAN():
         save(self.discriminator, "discriminator")
 
 if __name__ == '__main__':
-    (X_train, y_train) = extract_training_samples('digits')
+    (X_train, y_train), (X_test, y_test) = cifar10.load_data()
 
     dcgan = DCGAN()
     dcgan.load_model()
