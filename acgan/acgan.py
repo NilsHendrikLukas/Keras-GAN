@@ -418,7 +418,7 @@ class ACGAN():
                     self.execute_logan_mia()
                 if self.log_dist_mia:
                     self.execute_dist_mia()
-                if self.log_featuremap_mia:
+                if epoch > 3000 and self.log_featuremap_mia:
                     self.execute_featuremap_mia()
 
     def execute_featuremap_mia(self):
