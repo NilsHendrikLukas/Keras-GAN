@@ -21,7 +21,7 @@ from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
 
 class DCGAN():
     def __init__(self,
-                 n_samples=50000,
+                 n_samples=30000,
                  linspace_triplets_logan=(0, 200, 300),
                  log_logan_mia=False,
                  featuremap_mia_epochs=100,
@@ -287,14 +287,14 @@ class DCGAN():
 
     def execute_featuremap_mia(self):
         n = 500
-        x_in, x_out = self.X_train[0:n], self.X_train[n:n + n]
+        x_in, x_out = self.X_train[0:n], self.X_train[n:self.n_samples + n]
         if self.featuremap_discriminator is None:
             self.featuremap_discriminator = self.get_featuremap_discriminator()
         max_acc = featuremap_mia(self.featuremap_discriminator, None, 10, x_in, x_out)
 
     def execute_dist_mia(self):
         n = 500
-        x_in, x_out = self.X_train[0:n], self.X_train[n:n + n]
+        x_in, x_out = self.X_train[0:n], self.X_train[n:self.n_samples + n]
         max_acc = distance_mia(self.generator, x_in, x_out)
 
         with open('Keras-GAN/dcgan/logs/dist_mia.csv', mode='a') as file_:
@@ -303,7 +303,7 @@ class DCGAN():
 
     def execute_logan_mia(self):
         n = min(self.n_samples, 1000)
-        x_in, x_out = self.X_train[0:n], self.X_train[n:n+n]
+        x_in, x_out = self.X_train[0:n], self.X_train[n:self.n_samples+n]
         max_acc = logan_mia(self.get_logit_discriminator(), x_in, x_out)
 
         with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
