@@ -15,13 +15,14 @@ import matplotlib.pyplot as plt
 import sys
 
 import numpy as np
+from sklearn.utils import shuffle
 
 from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
 
 
 class DCGAN():
     def __init__(self,
-                 n_samples=30000,
+                 n_samples=25000,
                  linspace_triplets_logan=(0, 200, 300),
                  log_logan_mia=False,
                  featuremap_mia_epochs=100,
@@ -287,7 +288,9 @@ class DCGAN():
 
     def execute_featuremap_mia(self):
         n = 500
-        x_in, x_out = self.X_train[0:n], self.X_train[self.n_samples:self.n_samples + n]
+        all_in_data, all_out_data = shuffle(self.X_train[0:self.n_samples], self.X_train[self.n_samples:])
+
+        x_in, x_out = all_in_data[:n], all_out_data[:n]
         if self.featuremap_discriminator is None:
             self.featuremap_discriminator = self.get_featuremap_discriminator()
         self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator, self.featuremap_attacker, 25, x_in, x_out)
@@ -295,6 +298,7 @@ class DCGAN():
     def execute_dist_mia(self):
         n = 50
         x_in, x_out = self.X_train[0:n], self.X_train[self.n_samples:self.n_samples + n]
+
         max_acc = distance_mia(self.generator, x_in, x_out)
 
         with open('Keras-GAN/dcgan/logs/dist_mia.csv', mode='a') as file_:
