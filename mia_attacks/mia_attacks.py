@@ -80,7 +80,7 @@ def featuremap_mia(featuremap_discriminator,
         plt.legend()
         plt.show()
 
-    return max_acc
+    return c_disc
 
 
 def distance_mia(generator,
