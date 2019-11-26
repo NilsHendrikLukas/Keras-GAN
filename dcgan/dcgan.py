@@ -267,7 +267,6 @@ class DCGAN():
 
     def get_logit_discriminator(self):
         print("Logit discriminator")
-        self.discriminator.layers[-1].summary()
         if self.logit_discriminator is None:
             feature_maps = self.discriminator.layers[-1].layers[-2].output
             new_logits = Dense(1)(feature_maps)
