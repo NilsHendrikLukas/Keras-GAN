@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 from keras import initializers
 from keras.datasets import cifar10
+from keras.initializers import RandomNormal
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
@@ -50,36 +51,39 @@ class DCGAN():
         self.combined = Model(z, valid)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
 
+    def transposed_conv(self, model, out_channels):
+        model.add(Conv2DTranspose(out_channels, [5, 5], strides=(
+            2, 2), padding='same', kernel_initializer=RandomNormal(stddev=0.02)))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(alpha=0.2))
+        return model
+
+    def conv(self, model, out_channels):
+        model.add(Conv2D(out_channels, (5, 5),
+                         kernel_initializer=RandomNormal(stddev=0.02)))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(alpha=0.2))
+        return model
+
     def build_generator(self):
 
         # Generator network
+        downsize = 3
+        scale = 2 ** downsize
+
         model = Sequential()
-
-        init = initializers.RandomNormal(stddev=0.02)
-        # FC: 2x2x512
-        model.add(Dense(2 * 2 * 512, input_shape=(self.latent_dim,), kernel_initializer=init))
-        model.add(Reshape((2, 2, 512)))
+        model.add(Dense(32 // scale * 32 // scale * 1024,
+                        input_dim=self.latent_dim, kernel_initializer=RandomNormal(stddev=0.02)))
         model.add(BatchNormalization())
-        model.add(LeakyReLU(0.2))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(
+            Reshape([32 // scale, 32// scale, 1024]))
+        model = self.transposed_conv(model, 64)
+        if (downsize == 3):
+            model = self.transposed_conv(model, 32)
+        model.add(Conv2DTranspose(3, [5, 5], strides=(
+            2, 2), activation='tanh', padding='same', kernel_initializer=RandomNormal(stddev=0.02)))
 
-        # # Conv 1: 4x4x256
-        model.add(Conv2DTranspose(256, kernel_size=5, strides=2, padding='same'))
-        model.add(BatchNormalization())
-        model.add(LeakyReLU(0.2))
-
-        # Conv 2: 8x8x128
-        model.add(Conv2DTranspose(128, kernel_size=5, strides=2, padding='same'))
-        model.add(BatchNormalization())
-        model.add(LeakyReLU(0.2))
-
-        # Conv 3: 16x16x64
-        model.add(Conv2DTranspose(64, kernel_size=5, strides=2, padding='same'))
-        model.add(BatchNormalization())
-        model.add(LeakyReLU(0.2))
-
-        # Conv 4: 32x32x3
-        model.add(Conv2DTranspose(3, kernel_size=5, strides=2, padding='same',
-                                      activation='tanh'))
 
         model.summary()
 
