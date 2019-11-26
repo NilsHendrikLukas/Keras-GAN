@@ -16,6 +16,9 @@ import sys
 
 import numpy as np
 
+from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
+
+
 class DCGAN():
     def __init__(self,
                  n_samples=50000,
@@ -71,6 +74,16 @@ class DCGAN():
         # Trains the generator to fool the discriminator
         self.combined = Model(z, valid)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
+
+        # Load the dataset
+        (self.X_train, _), (X_test, _) = cifar10.load_data()
+        # Rescale 0 to 1
+        self.X_train = (self.X_train - 127.5) / 127.5
+
+        self.logit_discriminator = None
+        self.gan_discriminator = None
+        self.featuremap_discriminator = None
+        self.featuremap_attacker = None
 
     def transposed_conv(self, model, out_channels):
         model.add(Conv2DTranspose(out_channels, [5, 5], strides=(
@@ -153,14 +166,33 @@ class DCGAN():
 
         return Model(img, validity)
 
+    def get_gan_discriminator(self):
+        if self.gan_discriminator is None:
+            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            new_logits = Dense(1)(feature_maps)
+            self.gan_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.gan_discriminator.name = "gan_discriminator"
+        self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
+        return self.gan_discriminator
+
+    def get_logit_discriminator(self):
+        if self.logit_discriminator is None:
+            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            new_logits = Dense(10)(feature_maps)
+            self.logit_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.logit_discriminator.name = "logit_discriminator"
+        self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-1].get_weights())
+        return self.logit_discriminator
+
+    def get_featuremap_discriminator(self):
+        if self.featuremap_discriminator is None:
+            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            print("FeatureMaps Layer: {}".format(feature_maps))
+            self.featuremap_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[feature_maps])
+            self.featuremap_discriminator.name = "featuremap_discriminator"
+        return self.featuremap_discriminator
+
     def train(self, epochs, batch_size=128, save_interval=50):
-
-        # Load the dataset
-        (X_train, _), (X_test, _) = cifar10.load_data()
-
-        # Rescale 0 to 1
-        X_train = (X_train - 127.5) / 127.5
-
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
@@ -173,8 +205,8 @@ class DCGAN():
             # ---------------------
 
             # Select a random half of images
-            idx = np.random.randint(0, X_train.shape[0], batch_size)
-            imgs = X_train[idx]
+            idx = np.random.randint(0, self.X_train.shape[0], batch_size)
+            imgs = self.X_train[idx]
 
             # Sample noise and generate a batch of new images
             noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
@@ -199,6 +231,11 @@ class DCGAN():
             if epoch % save_interval == 0:
                 self.save_imgs(epoch)
 
+                # Perform the MIA
+                self.execute_logan_mia()
+                self.execute_dist_mia()
+                self.execute_featuremap_mia()
+
     def save_imgs(self, epoch):
         r, c = 5, 5
         noise = np.random.normal(0, 1, (r * c, self.latent_dim))
@@ -219,223 +256,46 @@ class DCGAN():
 
 
     def get_gan_discriminator(self):
+            print("GAN discriminator")
             if self.gan_discriminator is None:
-                feature_maps = self.discriminator.layers[-3].layers[-1].output
+                feature_maps = self.discriminator.layers[-1].layers[-1].output
                 new_logits = Dense(1)(feature_maps)
                 self.gan_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
                 self.gan_discriminator.name = "gan_discriminator"
-            self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-2].get_weights())
+            self.gan_discriminator.layers[-1].set_weights(self.discriminator.layers[-1].get_weights())
             return self.gan_discriminator
 
     def get_logit_discriminator(self):
+        print("Logit discriminator")
+        self.discriminator.layers[-1].summary()
         if self.logit_discriminator is None:
-            feature_maps = self.discriminator.layers[-3].layers[-1].output
-            new_logits = Dense(10)(feature_maps)
+            feature_maps = self.discriminator.layers[-1].layers[-2].output
+            new_logits = Dense(1)(feature_maps)
             self.logit_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[new_logits])
             self.logit_discriminator.name = "logit_discriminator"
-        self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-1].get_weights())
+        self.logit_discriminator.layers[-1].set_weights(self.discriminator.layers[-1].layers[-1].get_weights())
         return self.logit_discriminator
 
     def get_featuremap_discriminator(self):
+        print("Featuremap discriminator")
         if self.featuremap_discriminator is None:
-            feature_maps = self.discriminator.layers[-3].layers[-1].output
+            feature_maps = self.discriminator.layers[-1].layers[-2].output
             print("FeatureMaps Layer: {}".format(feature_maps))
             self.featuremap_discriminator = Model(inputs=[self.discriminator.layers[1].get_input_at(0)], outputs=[feature_maps])
             self.featuremap_discriminator.name = "featuremap_discriminator"
         return self.featuremap_discriminator
 
-    def featuremap_mia(self,
-                x_in,
-                x_out,
-                plot_graph=False):
-        """
-        Take 50% of the training data and feed it through the neural network
-        """
-        x_in, x_out = np.reshape(x_in, (-1, 28, 28, 1)), np.reshape(x_out, (-1, 28, 28, 1))
-
-        # gan_disc_model = self.get_gan_discriminator()
-        # y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
-
-        self.featuremap_discriminator = self.get_featuremap_discriminator()
-        y_pred_in, y_pred_out = self.featuremap_discriminator.predict(x_in), self.featuremap_discriminator.predict(x_out)
-
-        def train_discriminator(y_pred_in, y_pred_out, validation_data):
-            if self.featuremap_attacker is None:
-                model = Sequential()
-                model.name = "featuremap_mia"
-
-                model.add(Dense(input_shape=(y_pred_in.shape[1:]), units=500))
-                model.add(Dropout(0.2))
-                model.add(Dense(units=250))
-                model.add(Dropout(0.2))
-                model.add(Dense(units=10))
-                model.add(Dense(units=1, activation="sigmoid"))
-
-                model.compile(optimizer="Adam",
-                            metrics=["accuracy"],
-                            loss="binary_crossentropy")
-                self.featuremap_attacker = model
-            self.featuremap_attacker.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
-                np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
-                validation_data=validation_data,
-                epochs=self.featuremap_mia_epochs,
-                verbose=1)
-            return self.featuremap_attacker
-
-        n = int(len(y_pred_in)/2)
-        val_data = (np.concatenate((y_pred_in[n:], y_pred_out[n:]), axis=0),
-                    np.concatenate((np.zeros(len(y_pred_in[n:])), np.ones(len(y_pred_out[n:])))))
-        c_disc = train_discriminator(y_pred_in[:n], y_pred_out[:n], val_data)
-        y_pred_in = c_disc.predict(y_pred_in[n:])
-        y_pred_out = c_disc.predict(y_pred_out[n:])
-
-        # Get the accuracy for both approaches
-        x = np.linspace(0,1, 100)
-        y_acc = []  # Total accuracy per threshold
-        y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
-        for thresh in x:
-            accuracy_in = np.where(y_pred_in >= thresh)[0]  # Correctly captured
-            accuracy_out = np.where(y_pred_out < thresh)[0]  # Correctly captured
-            selected_samples = np.where((np.concatenate((y_pred_in, y_pred_out), axis=0) >= thresh))[0]
-
-            total_acc = (len(accuracy_in) + len(accuracy_out)) / (len(y_pred_in) + len(y_pred_out))
-            total_samples = len(selected_samples) / (len(y_pred_in) + len(y_pred_out))
-
-            y_acc.append(total_acc)
-            y_sel.append(total_samples)
-
-        max_acc = max(y_acc)
-        print("Featuremap Maximum Accuracy: {}".format(max_acc))
-
-        if plot_graph:
-            plt.title("[Featuremap] Membership Inference Accuracy")
-            plt.xlabel("Threshold")
-            plt.ylabel("Ratio")
-            plt.plot(x, y_acc, label="Membership Inference Accuracy")
-            plt.plot(x, y_sel, label="Positive samples")
-            plt.legend()
-            plt.show()
-
-        return max_acc
-
-
-    def distance_mia(self,
-                x_in,
-                x_out,
-                plot_graph=False):
-        """
-        Membership inference based on output distance of images generated by the GAN and the two datasets
-        """
-        # Generate inputs from the generator
-        n_generated_images = 100
-        noise = np.random.normal(0, 1, (n_generated_images, self.latent_dim))
-        sampled_labels = np.random.randint(0, 10, (n_generated_images, 1))
-        gen_imgs = np.reshape(self.generator.predict([noise, sampled_labels]), (-1, 28, 28))
-
-        def get_distances(x_data, gen_imgs):
-            distances = []
-            for suspect_img in x_data:
-                min_distance = np.inf
-                for gen_img in gen_imgs:
-                    dist = np.linalg.norm(suspect_img-np.reshape(gen_img, (28, 28)), ord=2)
-                    if dist < min_distance:
-                        min_distance = dist
-                distances.append(min_distance)
-            return distances
-
-        x_dist_in = get_distances(x_in, gen_imgs)
-        x_dist_out = get_distances(x_out, gen_imgs)
-
-        print("Mean Dist in: {}".format(np.mean(x_dist_in)))
-        print("Mean Dist out: {}".format(np.mean(x_dist_out)))
-
-        # Get the accuracy for both approaches
-        x = np.linspace(*self.linspace_triplets_dist)
-        y_acc = []  # Total accuracy per threshold
-        y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
-        for thresh in x:
-            accuracy_in = np.where(x_dist_in <= thresh)[0]  # Correctly captured
-            accuracy_out = np.where(x_dist_out > thresh)[0]  # Correctly captured
-            selected_samples = np.where((np.concatenate((x_dist_in, x_dist_out), axis=0) >= thresh))[0]
-
-            total_acc = (len(accuracy_in) + len(accuracy_out)) / (len(x_dist_in) + len(x_dist_out))
-            total_samples = len(selected_samples) / (len(x_dist_in) + len(x_dist_out))
-
-            y_acc.append(total_acc)
-            y_sel.append(total_samples)
-
-        max_acc = max(y_acc)
-        print("Distance Maximum Accuracy: {}".format(max_acc))
-
-        if plot_graph:
-            plt.title("[Distance] Membership Inference Accuracy")
-            plt.xlabel("Threshold")
-            plt.ylabel("Ratio")
-            plt.plot(x, y_acc, label="Membership Inference Accuracy")
-            plt.plot(x, y_sel, label="Positive samples")
-            plt.legend()
-            plt.show()
-
-        return max_acc
-
-    def logan_mia(self,
-                x_in,
-                x_out,
-                plot_graph=False):
-        """
-        Membership inference attack with the LOGAN paper
-        @:param x_in The images in the dataset
-        @:param x_out The images out of the dataset
-        """
-        x_in, x_out = np.reshape(x_in, (-1, 28, 28, 1)), np.reshape(x_out, (-1, 28, 28, 1))
-
-        #gan_disc_model = self.get_gan_discriminator()
-        #y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
-
-        logit_model = self.get_logit_discriminator()
-        y_pred_in, y_pred_out = np.max(logit_model.predict(x_in), axis=1), np.max(logit_model.predict(x_out), axis=1)
-
-        print(y_pred_in.mean())
-        print(y_pred_out.mean())
-
-        # Get the accuracy for both approaches
-        x = np.linspace(*self.linspace_triplets_logan)
-        y_acc = [] # Total accuracy per threshold
-        y_sel = [] # Ratio of dataset that has a confidence score greater than threshold
-        for thresh in x:
-            accuracy_in = np.where(y_pred_in >= thresh)[0]   # Correctly captured
-            accuracy_out = np.where(y_pred_out < thresh)[0]  # Correctly captured
-            selected_samples = np.where((np.concatenate((y_pred_in, y_pred_out), axis=0) >= thresh))[0]
-
-            total_acc = (len(accuracy_in)+len(accuracy_out))/(len(y_pred_in) + len(y_pred_out))
-            total_samples = len(selected_samples)/(len(y_pred_in) + len(y_pred_out))
-
-            y_acc.append(total_acc)
-            y_sel.append(total_samples)
-
-        max_acc = max(y_acc)
-        print("LOGAN Maximum Accuracy: {}".format(max_acc))
-
-        if plot_graph:
-            plt.title("[LOGAN] Membership Inference Accuracy")
-            plt.xlabel("Threshold")
-            plt.ylabel("Ratio")
-            plt.plot(x, y_acc, label="Membership Inference Accuracy")
-            plt.plot(x, y_sel, label="Positive samples")
-            plt.legend()
-            plt.show()
-
-        return max_acc
-
     def execute_featuremap_mia(self):
-        n = min(self.n_samples, 1000)
-        x_in, x_out = self.X_train[0:n], self.X_train[100000:100000 + n]
-        max_acc = self.featuremap_mia(x_in, x_out)
+        n = 500
+        x_in, x_out = self.X_train[0:n], self.X_train[n:n + n]
+        if self.featuremap_discriminator is None:
+            self.featuremap_discriminator = self.get_featuremap_discriminator()
+        max_acc = featuremap_mia(self.featuremap_discriminator, None, 10, x_in, x_out)
 
     def execute_dist_mia(self):
-        n = min(self.n_samples, 1000)
-        x_in, x_out = self.X_train[0:n], self.X_train[100000:100000 + n]
-        max_acc = self.distance_mia(x_in, x_out)
+        n = 500
+        x_in, x_out = self.X_train[0:n], self.X_train[n:n + n]
+        max_acc = distance_mia(self.generator, x_in, x_out)
 
         with open('Keras-GAN/dcgan/logs/dist_mia.csv', mode='a') as file_:
             file_.write("{}".format(max_acc))
@@ -443,10 +303,10 @@ class DCGAN():
 
     def execute_logan_mia(self):
         n = min(self.n_samples, 1000)
-        x_in, x_out = self.X_train[0:n], self.X_train[100000:100000+n]
-        max_acc = self.logan_mia(x_in, x_out)
+        x_in, x_out = self.X_train[0:n], self.X_train[n:n+n]
+        max_acc = logan_mia(self.get_logit_discriminator(), x_in, x_out)
 
-        with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='a') as file_:
+        with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
             file_.write("{}".format(max_acc))
             file_.write("\n")
 
