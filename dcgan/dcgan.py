@@ -234,7 +234,7 @@ class DCGAN():
 
                 # Perform the MIA
                 self.execute_logan_mia()
-                self.execute_dist_mia()
+                #self.execute_dist_mia()
                 self.execute_featuremap_mia()
 
     def save_imgs(self, epoch):
