@@ -290,7 +290,7 @@ class DCGAN():
         x_in, x_out = self.X_train[0:n], self.X_train[self.n_samples:self.n_samples + n]
         if self.featuremap_discriminator is None:
             self.featuremap_discriminator = self.get_featuremap_discriminator()
-        max_acc = featuremap_mia(self.featuremap_discriminator, None, 25, x_in, x_out)
+        self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator, self.featuremap_attacker, 25, x_in, x_out)
 
     def execute_dist_mia(self):
         n = 50
