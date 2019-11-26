@@ -288,7 +288,7 @@ class DCGAN():
 
     def execute_featuremap_mia(self):
         n = 500
-        all_in_data, all_out_data = shuffle(self.X_train[0:self.n_samples], self.X_train[self.n_samples:])
+        all_in_data, all_out_data = shuffle(self.X_train[0:self.n_samples], self.X_train[self.n_samples:2*self.n_samples])
 
         x_in, x_out = all_in_data[:n], all_out_data[:n]
         if self.featuremap_discriminator is None:
@@ -306,8 +306,11 @@ class DCGAN():
             file_.write("\n")
 
     def execute_logan_mia(self):
-        n = 1000
-        x_in, x_out = self.X_train[0:n], self.X_train[self.n_samples:self.n_samples+n]
+        n = 500
+        all_in_data, all_out_data = shuffle(self.X_train[0:self.n_samples],
+                                            self.X_train[self.n_samples:2 * self.n_samples])
+
+        x_in, x_out = all_in_data[:n], all_out_data[:n]
         max_acc = logan_mia(self.get_logit_discriminator(), x_in, x_out)
 
         with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
