@@ -138,8 +138,8 @@ class DCGAN():
         (X_train, _), (X_test, _) = cifar10.load_data()
 
         # Rescale 0 to 1
-        X_train = X_train / 255.
-        X_test = X_test / 255.
+        X_train = (X_train - 127.5) / 127.5
+
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
