@@ -293,7 +293,7 @@ class DCGAN():
         max_acc = featuremap_mia(self.featuremap_discriminator, None, 10, x_in, x_out)
 
     def execute_dist_mia(self):
-        n = 500
+        n = 50
         x_in, x_out = self.X_train[0:n], self.X_train[n:self.n_samples + n]
         max_acc = distance_mia(self.generator, x_in, x_out)
 
@@ -302,7 +302,7 @@ class DCGAN():
             file_.write("\n")
 
     def execute_logan_mia(self):
-        n = min(self.n_samples, 1000)
+        n = 1000
         x_in, x_out = self.X_train[0:n], self.X_train[n:self.n_samples+n]
         max_acc = logan_mia(self.get_logit_discriminator(), x_in, x_out)
 
