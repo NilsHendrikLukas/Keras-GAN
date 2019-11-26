@@ -17,13 +17,35 @@ import sys
 import numpy as np
 
 class DCGAN():
-    def __init__(self):
+    def __init__(self,
+                 n_samples=50000,
+                 linspace_triplets_logan=(0, 200, 300),
+                 log_logan_mia=False,
+                 featuremap_mia_epochs=100,
+                 log_featuremap_mia=False,
+                 linspace_triplets_dist=(1800, 2300, 1000),
+                 log_dist_mia=False,
+                 load_model=False):
+
+        self.log_logan_mia = log_logan_mia
+        self.log_dist_mia = log_dist_mia
+        self.featuremap_mia_epochs=featuremap_mia_epochs
+        self.log_featuremap_mia=log_featuremap_mia
+        self.n_samples = n_samples
+        self.linspace_triplets_logan = linspace_triplets_logan
+        self.linspace_triplets_dist = linspace_triplets_dist    
+        
+        self.dataset = 'cifar10'
+    
         # Input shape
         self.img_rows = 32
         self.img_cols = 32
         self.channels = 3
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.latent_dim = 100
+        self.train = self.train
+        self.save 
+            
 
         optimizer = Adam(0.0002, 0.5)
 
@@ -455,8 +477,8 @@ class DCGAN():
             options = {"file_weight": weights_path}
             model.load_weights(options['file_weight'])
 
-        load(self.generator, "generator")
-        load(self.discriminator, "discriminator")
+        load(self.generator, "generator_"+str(self.dataset))
+        load(self.discriminator, "discriminator_"+str(self.dataset))
 
     def save_model(self):
 
@@ -469,20 +491,24 @@ class DCGAN():
             open(options['file_arch'], 'w').write(json_string)
             model.save_weights(options['file_weight'])
 
-        save(self.generator, "generator")
-        save(self.discriminator, "discriminator")
+        save(self.generator, "generator_"+str(self.dataset))
+        save(self.discriminator, "discriminator_"+str(self.dataset))
 
 if __name__ == '__main__':
     (X_train, y_train), (X_test, y_test) = cifar10.load_data()
-
+    
     dcgan = DCGAN()
-    dcgan.load_model()
+    
+    dcgan.train(2000)
+    dcgan.save_model()
+    
+    # dcgan.load_model()
 
-    n = 500
-    x_in, x_out = X_train[0:n], X_train[100000:100000+n]
-    x_in = x_in.astype(np.float32)-127.5/127.5
-    x_out = x_out.astype(np.float32) - 127.5 / 127.5
+    # n = 500
+    # x_in, x_out = X_train[0:n], X_train[100000:100000+n]
+    # x_in = x_in.astype(np.float32)-127.5/127.5
+    # x_out = x_out.astype(np.float32) - 127.5 / 127.5
 
-    dcgan.featuremap_mia(x_in, x_out, plot_graph=True)
-    dcgan.distance_mia(x_in, x_out, plot_graph=True)
-    dcgan.logan_mia(x_in, x_out, plot_graph=True)
+    # dcgan.featuremap_mia(x_in, x_out, plot_graph=True)
+    # dcgan.distance_mia(x_in, x_out, plot_graph=True)
+    # dcgan.logan_mia(x_in, x_out, plot_graph=True)
