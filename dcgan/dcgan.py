@@ -242,11 +242,12 @@ class DCGAN():
                         imgs = self.X_train[idx]
                         self.discriminator.train_on_batch(imgs, valid)
 
-                overfit_discriminator(20)
+                overfit_discriminator(0)
                 #### Added
+
                 self.execute_logan_mia()
                 #self.execute_dist_mia()
-                #self.execute_featuremap_mia()
+                self.execute_featuremap_mia()
 
     def save_imgs(self, epoch):
         r, c = 5, 5
