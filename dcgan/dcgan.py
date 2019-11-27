@@ -205,8 +205,8 @@ class DCGAN():
             #  Train Discriminator
             # ---------------------
 
-            # Select a random half of images
-            idx = np.random.randint(0, self.X_train.shape[0], batch_size)
+            # Select images (at most until nsamples many
+            idx = np.random.randint(0, self.n_samples, batch_size)
             imgs = self.X_train[idx]
 
             # Sample noise and generate a batch of new images
