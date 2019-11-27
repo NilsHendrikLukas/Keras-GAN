@@ -46,7 +46,7 @@ def featuremap_mia(featuremap_discriminator,
                                 np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
                                 validation_data=validation_data,
                                 epochs=epochs,
-                                verbose=1)
+                                verbose=0)
         return featuremap_attacker
 
     val_data = (np.concatenate((y_val_in, y_val_out), axis=0),
