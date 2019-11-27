@@ -21,6 +21,7 @@ def featuremap_mia(featuremap_discriminator,
     """
 
     y_pred_in, y_pred_out = featuremap_discriminator.predict(x_in), featuremap_discriminator.predict(x_out)
+    y_val_in, y_val_out = featuremap_discriminator.predict(x_in), featuremap_discriminator.predict(x_out)
 
     def train_discriminator(y_pred_in,
                             y_pred_out,
@@ -48,8 +49,8 @@ def featuremap_mia(featuremap_discriminator,
                                 verbose=1)
         return featuremap_attacker
 
-    val_data = (np.concatenate((y_pred_in, y_pred_out), axis=0),
-                np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))))
+    val_data = (np.concatenate((y_val_in, y_val_out), axis=0),
+                np.concatenate((np.zeros(len(y_val_in)), np.ones(len(y_val_out)))))
     c_disc = train_discriminator(y_pred_in, y_pred_out, val_data, featuremap_attacker)
 
     y_pred_in = c_disc.predict(featuremap_discriminator.predict(val_in))
