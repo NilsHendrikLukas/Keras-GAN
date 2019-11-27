@@ -10,6 +10,8 @@ def featuremap_mia(featuremap_discriminator,
                    epochs,
                    x_in,
                    x_out,
+                   val_in,
+                   val_out,
                    plot_graph=False):
     """
     Take 50% of the training data and feed it through the neural network
@@ -46,14 +48,12 @@ def featuremap_mia(featuremap_discriminator,
                                 verbose=1)
         return featuremap_attacker
 
-    n = int(len(y_pred_in) / 2)
-    val_data = (np.concatenate((y_pred_in[n:], y_pred_out[n:]), axis=0),
-                np.concatenate((np.zeros(len(y_pred_in[n:])), np.ones(len(y_pred_out[n:])))))
-    c_disc = train_discriminator(y_pred_in[:n], y_pred_out[:n], val_data, featuremap_attacker)
+    val_data = (np.concatenate((y_pred_in, y_pred_out), axis=0),
+                np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))))
+    c_disc = train_discriminator(y_pred_in, y_pred_out, val_data, featuremap_attacker)
 
-
-    y_pred_in = c_disc.predict(y_pred_in[n:])
-    y_pred_out = c_disc.predict(y_pred_out[n:])
+    y_pred_in = c_disc.predict(featuremap_discriminator.predict(val_in))
+    y_pred_out = c_disc.predict(featuremap_discriminator.predict(val_out))
 
     # Get the accuracy for both approaches
     x = np.linspace(y_pred_in.min(), y_pred_in.max(), 500)

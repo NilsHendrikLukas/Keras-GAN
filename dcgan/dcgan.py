@@ -299,12 +299,24 @@ class DCGAN():
 
     def execute_featuremap_mia(self):
         n = 500
-        all_in_data, all_out_data = shuffle(self.X_train[0:self.n_samples], self.X_train[self.n_samples:2*self.n_samples])
+        n_val = 500  # Samples used only in validation
+        val_in, val_out = self.X_train[:n_val], \
+                          self.X_train[self.n_samples:self.n_samples + n_val]
 
-        x_in, x_out = all_in_data[:n], all_out_data[:n]
+        train_in = self.X_train[n_val:self.n_samples]
+        train_out = self.X_train[self.n_samples + n_val:self.n_samples + n_val + len(train_in)]
+        train_in, train_out = shuffle(train_in, train_out)
+        train_in, train_out = train_in[:n], train_out[:n]
+
         if self.featuremap_discriminator is None:
             self.featuremap_discriminator = self.get_featuremap_discriminator()
-        self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator, self.featuremap_attacker, 25, x_in, x_out)
+        self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator,
+                                                  self.featuremap_attacker,
+                                                  epochs=25,
+                                                  x_in=train_in,
+                                                  x_out=train_out,
+                                                  val_in=val_in,
+                                                  val_out=val_out)
 
     def execute_dist_mia(self):
         n = 50
@@ -318,11 +330,16 @@ class DCGAN():
 
     def execute_logan_mia(self):
         n = 500
-        all_in_data, all_out_data = shuffle(self.X_train[0:self.n_samples],
-                                            self.X_train[self.n_samples:2 * self.n_samples])
+        n_val = 500     # Samples used ONLY in validation
+        val_in, val_out = self.X_train[:n_val], \
+                          self.X_train[self.n_samples:self.n_samples+n_val]
 
-        x_in, x_out = all_in_data[:n], all_out_data[:n]
-        max_acc = logan_mia(self.get_logit_discriminator(), x_in, x_out)
+        train_in = self.X_train[n_val:self.n_samples]
+        train_out = self.X_train[self.n_samples+n_val:self.n_samples+n_val+len(train_in)]
+        train_in, train_out = shuffle(train_in, train_out)
+        train_in, train_out = train_in[:n], train_out[:n]
+
+        max_acc = logan_mia(self.get_logit_discriminator(), train_in, train_out)
 
         with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
             file_.write("{}".format(max_acc))
