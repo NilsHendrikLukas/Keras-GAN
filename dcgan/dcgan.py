@@ -364,11 +364,11 @@ if __name__ == '__main__':
     (X_train, y_train), (X_test, y_test) = cifar10.load_data()
     
     dcgan = DCGAN()
-    
+
     dcgan.train(2000)
     dcgan.save_model()
-    
-    # dcgan.load_model()
+
+    dcgan.load_model()
 
     # n = 500
     # x_in, x_out = X_train[0:n], X_train[100000:100000+n]
