@@ -298,7 +298,7 @@ class DCGAN():
         return self.featuremap_discriminator
 
     def execute_featuremap_mia(self):
-        n = 500
+        n = 10000
         n_val = 500  # Samples used only in validation
         val_in, val_out = self.X_train[:n_val], \
                           self.X_train[self.n_samples:self.n_samples + n_val]
