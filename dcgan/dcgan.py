@@ -215,15 +215,8 @@ class DCGAN():
 
             # Train the discriminator (real classified as ones and generated as zeros)
             d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-            # d_loss_real = self.discriminator.train_on_batch(imgs, valid)
             d_loss_real = self.discriminator.train_on_batch(imgs, valid)
 
-            def overfit_discriminator(epochs):
-                for i in range(epochs):
-                    idx = np.random.randint(0, self.X_train.shape[0], batch_size)
-                    imgs = self.X_train[idx]
-                    self.discriminator.train_on_batch(imgs, valid)
-            overfit_discriminator(100)
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
             # ---------------------
@@ -242,6 +235,15 @@ class DCGAN():
                 self.save_imgs(epoch)
 
                 # Perform the MIA
+                #### Added
+                def overfit_discriminator(epochs):
+                    for i in range(epochs):
+                        idx = np.random.randint(0, self.X_train.shape[0], batch_size)
+                        imgs = self.X_train[idx]
+                        self.discriminator.train_on_batch(imgs, valid)
+
+                overfit_discriminator(20)
+                #### Added
                 self.execute_logan_mia()
                 #self.execute_dist_mia()
                 #self.execute_featuremap_mia()
