@@ -303,7 +303,7 @@ class DCGAN():
         val_in, val_out = self.X_train[:n_val], \
                           self.X_train[self.n_samples:self.n_samples + n_val]
 
-        train_in = self.X_train[n_val:self.n_samples]
+        train_in = self.X_train[n_val:self.n_samples+n_val]
         train_out = self.X_train[self.n_samples + n_val:self.n_samples + n_val + len(train_in)]
         train_in, train_out = shuffle(train_in, train_out)
         train_in, train_out = train_in[:n], train_out[:n]
@@ -334,7 +334,7 @@ class DCGAN():
         val_in, val_out = self.X_train[:n_val], \
                           self.X_train[self.n_samples:self.n_samples+n_val]
 
-        train_in = self.X_train[n_val:self.n_samples]
+        train_in = self.X_train[n_val:self.n_samples+n_val]
         train_out = self.X_train[self.n_samples+n_val:self.n_samples+n_val+len(train_in)]
         train_in, train_out = shuffle(train_in, train_out)
         train_in, train_out = train_in[:n], train_out[:n]
