@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 
 from keras import initializers
-from keras.datasets import cifar10
+from keras.datasets import cifar10, mnist
 from keras.initializers import RandomNormal
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
@@ -19,6 +19,8 @@ import sys
 import numpy as np
 from sklearn.utils import shuffle
 
+import sys
+sys.path.append('Keras-GAN')
 from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
 class WGAN():
     def __init__(self,
@@ -200,8 +202,8 @@ class WGAN():
             g_loss = self.combined.train_on_batch(noise, valid)
 
             # Plot the progress
-            print ("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
-
+            print("{} [D loss {:.2f}, acc.: {:.2f}] [G loss {:.2f}]".format(epoch, d_loss[0], 100*d_loss[1], g_loss),
+                  end='\r')
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
@@ -211,14 +213,14 @@ class WGAN():
                     for i in range(epochs):
                         idx = np.random.randint(0, self.X_train.shape[0], batch_size)
                         imgs = self.X_train[idx]
-                        self.discriminator.train_on_batch(imgs, valid)
+                        self.critic.train_on_batch(imgs, valid)
 
                 overfit_discriminator(0)
                 #### Added
 
                 self.execute_logan_mia()
                 #self.execute_dist_mia()
-                self.execute_featuremap_mia()
+                # self.execute_featuremap_mia()
 
     def sample_images(self, epoch):
         r, c = 5, 5
@@ -346,7 +348,7 @@ class WGAN():
 if __name__ == '__main__':
     wgan = WGAN()
 
-    wgan.train(epochs=4000, batch_size=32, sample_interval=50)
+    wgan.train(epochs=4000, batch_size=32, sample_interval=5)
     # wgan.train(epochs=40000, batch_size=32, sample_interval=50)
     wgan.save_model()
 
