@@ -8,7 +8,7 @@ from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
-from keras.optimizers import Adam
+from keras.optimizers import Adam, RMSprop
 
 import matplotlib.pyplot as plt
 
@@ -346,8 +346,8 @@ class WGAN():
 if __name__ == '__main__':
     wgan = WGAN()
 
-    wgab.train(epochs=4000, batch_size=32, sample_interval=50)
-    # wgan.train(epochs=40000, batch_size=128, sample_interval=50)
+    wgan.train(epochs=4000, batch_size=32, sample_interval=50)
+    # wgan.train(epochs=40000, batch_size=32, sample_interval=50)
     wgan.save_model()
 
     # wgan.load_model()
