@@ -1,28 +1,58 @@
 from __future__ import print_function, division
 
-from keras.datasets import mnist
+from keras import initializers
+from keras.datasets import cifar10
+from keras.initializers import RandomNormal
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import UpSampling2D, Conv2D
+from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
-from keras.optimizers import RMSprop
-
-import keras.backend as K
+from keras.optimizers import Adam
 
 import matplotlib.pyplot as plt
+
+import keras.backend as K
 
 import sys
 
 import numpy as np
+from sklearn.utils import shuffle
 
+from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
 class WGAN():
-    def __init__(self):
+    def __init__(self,
+                 n_samples=5000,
+                 linspace_triplets_logan=(0, 200, 300),
+                 log_logan_mia=False,
+                 featuremap_mia_epochs=100,
+                 log_featuremap_mia=False,
+                 linspace_triplets_dist=(1800, 2300, 1000),
+                 log_dist_mia=False,
+                 load_model=False,
+                 dataset='mnist'):
+
+        # Input shape
+        # CIFAR
+        # self.img_rows = 32
+        # self.img_cols = 32
+        # self.channels = 3
+        # MNIST
         self.img_rows = 28
         self.img_cols = 28
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.latent_dim = 100
+
+        self.log_logan_mia = log_logan_mia
+        self.log_dist_mia = log_dist_mia
+        self.featuremap_mia_epochs=featuremap_mia_epochs
+        self.log_featuremap_mia=log_featuremap_mia
+        self.n_samples = n_samples
+        self.linspace_triplets_logan = linspace_triplets_logan
+        self.linspace_triplets_dist = linspace_triplets_dist   
+
+        self.dataset = 'mnist'
 
         # Following parameter and optimizer set as recommended in paper
         self.n_critic = 5
@@ -53,6 +83,22 @@ class WGAN():
         self.combined.compile(loss=self.wasserstein_loss,
             optimizer=optimizer,
             metrics=['accuracy'])
+
+
+        # Load the dataset
+        # (self.X_train, _), (X_test, _) = cifar10.load_data()
+        (self.X_train, _), (X_test, _) = mnist.load_data()
+        # Rescale 0 to 1
+        self.X_train = (self.X_train - 127.5) / 127.5
+
+        #MNIST only
+        self.X_train = np.expand_dims(self.X_train, axis=3)
+
+        self.logit_discriminator = None
+        self.gan_discriminator = None
+        self.featuremap_discriminator = None
+        self.featuremap_attacker = None
+
 
     def wasserstein_loss(self, y_true, y_pred):
         return K.mean(y_true * y_pred)
@@ -113,13 +159,6 @@ class WGAN():
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
-        # Load the dataset
-        (X_train, _), (_, _) = mnist.load_data()
-
-        # Rescale -1 to 1
-        X_train = (X_train.astype(np.float32) - 127.5) / 127.5
-        X_train = np.expand_dims(X_train, axis=3)
-
         # Adversarial ground truths
         valid = -np.ones((batch_size, 1))
         fake = np.ones((batch_size, 1))
@@ -133,8 +172,8 @@ class WGAN():
                 # ---------------------
 
                 # Select a random batch of images
-                idx = np.random.randint(0, X_train.shape[0], batch_size)
-                imgs = X_train[idx]
+                idx = np.random.randint(0, self.n_samples, batch_size)
+                imgs = self.X_train[idx]
                 
                 # Sample noise as generator input
                 noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
@@ -166,6 +205,20 @@ class WGAN():
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
+                # Perform the MIA
+                #### Added
+                def overfit_discriminator(epochs):
+                    for i in range(epochs):
+                        idx = np.random.randint(0, self.X_train.shape[0], batch_size)
+                        imgs = self.X_train[idx]
+                        self.discriminator.train_on_batch(imgs, valid)
+
+                overfit_discriminator(0)
+                #### Added
+
+                self.execute_logan_mia()
+                #self.execute_dist_mia()
+                self.execute_featuremap_mia()
 
     def sample_images(self, epoch):
         r, c = 5, 5
@@ -179,13 +232,129 @@ class WGAN():
         cnt = 0
         for i in range(r):
             for j in range(c):
+                # axs[i,j].imshow(gen_imgs[cnt, :,:])
                 axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
                 axs[i,j].axis('off')
                 cnt += 1
         fig.savefig("Keras-GAN/wgan/images/mnist_%d.png" % epoch)
         plt.close()
 
+        return gen_imgs
+
+    def get_gan_discriminator(self):
+        print("GAN critic")
+        if self.gan_discriminator is None:
+            feature_maps = self.critic.layers[-1].layers[-1].output
+            new_logits = Dense(1)(feature_maps)
+            self.gan_discriminator = Model(inputs=[self.critic.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.gan_discriminator.name = "gan_discriminator"
+        self.gan_discriminator.layers[-1].set_weights(self.critic.layers[-1].get_weights())
+        return self.gan_discriminator
+
+    def get_logit_discriminator(self):
+        print("Logit discriminator")
+        if self.logit_discriminator is None:
+            feature_maps = self.critic.layers[-1].layers[-2].output
+            new_logits = Dense(1)(feature_maps)
+            self.logit_discriminator = Model(inputs=[self.critic.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.logit_discriminator.name = "logit_discriminator"
+        self.logit_discriminator.layers[-1].set_weights(self.critic.layers[-1].layers[-1].get_weights())
+        return self.logit_discriminator
+
+    def get_featuremap_discriminator(self):
+        print("Featuremap discriminator")
+        if self.featuremap_discriminator is None:
+            feature_maps = self.critic.layers[-1].layers[-2].output
+            print("FeatureMaps Layer: {}".format(feature_maps))
+            self.featuremap_discriminator = Model(inputs=[self.critic.layers[1].get_input_at(0)], outputs=[feature_maps])
+            self.featuremap_discriminator.name = "featuremap_discriminator"
+        return self.featuremap_discriminator
+
+
+    def execute_featuremap_mia(self):
+        n = 10000
+        n_val = 500  # Samples used only in validation
+        val_in, val_out = self.X_train[:n_val], \
+                          self.X_train[self.n_samples:self.n_samples + n_val]
+
+        train_in = self.X_train[n_val:self.n_samples+n_val]
+        train_out = self.X_train[self.n_samples + n_val:self.n_samples + n_val + len(train_in)]
+        train_in, train_out = shuffle(train_in, train_out)
+        train_in, train_out = train_in[:n], train_out[:n]
+
+        if self.featuremap_discriminator is None:
+            self.featuremap_discriminator = self.get_featuremap_discriminator()
+        self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator,
+                                                  self.featuremap_attacker,
+                                                  epochs=25,
+                                                  x_in=train_in,
+                                                  x_out=train_out,
+                                                  val_in=val_in,
+                                                  val_out=val_out)
+
+    def execute_dist_mia(self):
+        n = 50
+        x_in, x_out = self.X_train[0:n], self.X_train[self.n_samples:self.n_samples + n]
+
+        max_acc = distance_mia(self.generator, x_in, x_out)
+
+        with open('Keras-GAN/dcgan/logs/dist_mia.csv', mode='a') as file_:
+            file_.write("{}".format(max_acc))
+            file_.write("\n")
+
+    def execute_logan_mia(self):
+        n = 500
+        n_val = 500     # Samples used ONLY in validation
+        val_in, val_out = self.X_train[:n_val], \
+                          self.X_train[self.n_samples:self.n_samples+n_val]
+
+        train_in = self.X_train[n_val:self.n_samples+n_val]
+        train_out = self.X_train[self.n_samples+n_val:self.n_samples+n_val+len(train_in)]
+        train_in, train_out = shuffle(train_in, train_out)
+        train_in, train_out = train_in[:n], train_out[:n]
+
+        max_acc = logan_mia(self.get_logit_discriminator(), train_in, train_out)
+
+        with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
+            file_.write("{}".format(max_acc))
+            file_.write("\n")
+
+    def load_model(self):
+
+        def load(model, model_name):
+            weights_path = "Keras-GAN/wgan/saved_model/%s_weights.hdf5" % model_name
+            options = {"file_weight": weights_path}
+            model.load_weights(options['file_weight'])
+
+        load(self.generator, "generator_"+str(self.dataset))
+        load(self.critic, "discriminator_"+str(self.dataset))
+
+    def save_model(self):
+
+        def save(model, model_name):
+            model_path = "Keras-GAN/wgan/saved_model/%s.json" % model_name
+            weights_path = "Keras-GAN/wgan/saved_model/%s_weights.hdf5" % model_name
+            options = {"file_arch": model_path,
+                        "file_weight": weights_path}
+            json_string = model.to_json()
+            open(options['file_arch'], 'w').write(json_string)
+            model.save_weights(options['file_weight'])
+
+        save(self.generator, "generator_"+str(self.dataset))
+        save(self.critic, "discriminator_"+str(self.dataset))
 
 if __name__ == '__main__':
     wgan = WGAN()
-    wgan.train(epochs=4000, batch_size=32, sample_interval=50)
+
+    wgab.train(epochs=4000, batch_size=32, sample_interval=50)
+    # wgan.train(epochs=40000, batch_size=128, sample_interval=50)
+    wgan.save_model()
+
+    # wgan.load_model()
+    # n = 500
+    # x_in, x_out = X_train[0:n], X_train[100000:100000+n]
+    # x_in = x_in.astype(np.float32)-127.5/127.5
+    # x_out = x_out.astype(np.float32) - 127.5 / 127.5
+    # wgan.featuremap_mia(x_in, x_out, plot_graph=True)
+    # wgan.distance_mia(x_in, x_out, plot_graph=True)
+    # wgan.logan_mia(x_in, x_out, plot_graph=True)
