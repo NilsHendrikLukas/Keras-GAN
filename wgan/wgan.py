@@ -36,13 +36,14 @@ class WGAN():
 
         # Input shape
         # CIFAR
-        # self.img_rows = 32
-        # self.img_cols = 32
-        # self.channels = 3
+        self.img_rows = 32
+        self.img_cols = 32
+        self.channels = 3
         # MNIST
-        self.img_rows = 28
-        self.img_cols = 28
-        self.channels = 1
+        # self.img_rows = 28
+        # self.img_cols = 28
+        # self.channels = 1
+
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.latent_dim = 100
 
@@ -54,7 +55,7 @@ class WGAN():
         self.linspace_triplets_logan = linspace_triplets_logan
         self.linspace_triplets_dist = linspace_triplets_dist   
 
-        self.dataset = 'mnist'
+        self.dataset = dataset
 
         # Following parameter and optimizer set as recommended in paper
         self.n_critic = 5
@@ -88,13 +89,13 @@ class WGAN():
 
 
         # Load the dataset
-        # (self.X_train, _), (X_test, _) = cifar10.load_data()
-        (self.X_train, _), (X_test, _) = mnist.load_data()
+        (self.X_train, _), (X_test, _) = cifar10.load_data()
+        # (self.X_train, _), (X_test, _) = mnist.load_data()
         # Rescale 0 to 1
         self.X_train = (self.X_train - 127.5) / 127.5
 
         #MNIST only
-        self.X_train = np.expand_dims(self.X_train, axis=3)
+        # self.X_train = np.expand_dims(self.X_train, axis=3)
 
         self.logit_discriminator = None
         self.gan_discriminator = None
@@ -107,20 +108,43 @@ class WGAN():
 
     def build_generator(self):
 
+        downsize = 3
+        scale = 2 ** downsize
+
         model = Sequential()
 
-        model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
-        model.add(Reshape((7, 7, 128)))
-        model.add(UpSampling2D())
-        model.add(Conv2D(128, kernel_size=4, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Activation("relu"))
-        model.add(UpSampling2D())
-        model.add(Conv2D(64, kernel_size=4, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Activation("relu"))
-        model.add(Conv2D(self.channels, kernel_size=4, padding="same"))
-        model.add(Activation("tanh"))
+        # #MNIST 
+        # model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
+        # model.add(Reshape((7, 7, 128)))
+        # model.add(UpSampling2D())
+        # model.add(Conv2D(128, kernel_size=4, padding="same"))
+        # model.add(BatchNormalization(momentum=0.8))
+        # model.add(Activation("relu"))
+        # model.add(UpSampling2D())
+        # model.add(Conv2D(64, kernel_size=4, padding="same"))
+        # model.add(BatchNormalization(momentum=0.8))
+        # model.add(Activation("relu"))
+        # model.add(Conv2D(self.channels, kernel_size=4, padding="same"))
+        # model.add(Activation("tanh"))
+
+        #CIFAR10
+        model.add(Dense(32 // scale * 32 // scale * 1024,
+                        input_dim=self.latent_dim, kernel_initializer=RandomNormal(stddev=0.02)))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(Reshape([32 // scale, 32// scale, 1024]))
+        model.add(Conv2DTranspose(64, [5, 5], strides=(
+            2, 2), padding='same', kernel_initializer=RandomNormal(stddev=0.02)))
+        model.add(BatchNormalization())
+        model.add(LeakyReLU(alpha=0.2))
+        if (downsize == 3):
+                    model.add(Conv2DTranspose(32, [5, 5], strides=(
+                        2, 2), padding='same', kernel_initializer=RandomNormal(stddev=0.02)))
+                    model.add(BatchNormalization())
+                    model.add(LeakyReLU(alpha=0.2))
+        model.add(Conv2DTranspose(self.channels, [5, 5], strides=(
+            2, 2), activation='tanh', padding='same', kernel_initializer=RandomNormal(stddev=0.02)))
+
 
         model.summary()
 
@@ -131,26 +155,62 @@ class WGAN():
 
     def build_critic(self):
 
-        model = Sequential()
 
-        model.add(Conv2D(16, kernel_size=3, strides=2, input_shape=self.img_shape, padding="same"))
+        # ## MNIST_SIZED Network
+        # model = Sequential()
+        # # Conv 1
+        # model.add(Conv2D(16, kernel_size=3, strides=2, input_shape=self.img_shape, padding="same"))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(Dropout(0.25))
+        # # Conv 2
+        # model.add(Conv2D(32, kernel_size=3, strides=2, padding="same"))
+        # model.add(ZeroPadding2D(padding=((0,1),(0,1))))
+        # model.add(BatchNormalization(momentum=0.8))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(Dropout(0.25))
+        # # Conv 3
+        # model.add(Conv2D(64, kernel_size=3, strides=2, padding="same"))
+        # model.add(BatchNormalization(momentum=0.8))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(Dropout(0.25))
+        # # Conv 4
+        # model.add(Conv2D(128, kernel_size=3, strides=1, padding="same"))
+        # model.add(BatchNormalization(momentum=0.8))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(Dropout(0.25))
+        # #
+        # model.add(Flatten())
+        # # Output
+        # model.add(Dense(1, activation='sigmoid'))
+
+        ## CIFAR10 Network
+        model = Sequential()
+        # Conv 1
+        model.add(Conv2D(64, kernel_size=5, strides=2, input_shape= (self.img_shape), padding="same", kernel_initializer=RandomNormal(stddev=0.02)))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
-        model.add(Conv2D(32, kernel_size=3, strides=2, padding="same"))
-        model.add(ZeroPadding2D(padding=((0,1),(0,1))))
-        model.add(BatchNormalization(momentum=0.8))
+        # model.add(Dropout(0.25))
+        # Conv 2
+        model.add(Conv2D(128, kernel_size=5, strides=2, padding="same"))
+        # model.add(ZeroPadding2D(padding=((0,1),(0,1))))
+        model.add(BatchNormalization())
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
-        model.add(Conv2D(64, kernel_size=3, strides=2, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
+        # model.add(Dropout(0.25))
+        # Conv 3
+        model.add(Conv2D(256, kernel_size=5, strides=2, padding="same"))
+        model.add(BatchNormalization())
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
-        model.add(Conv2D(128, kernel_size=3, strides=1, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
+        # model.add(Dropout(0.25))
+        # Conv 4
+        model.add(Conv2D(512, kernel_size=5, strides=2, padding="same"))
+        model.add(BatchNormalization())
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        # model.add(Dropout(0.25))
+        #
         model.add(Flatten())
-        model.add(Dense(1))
+        # Output
+        model.add(Dense(1, activation='sigmoid'))
+
+
 
         model.summary()
 
@@ -238,7 +298,7 @@ class WGAN():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("Keras-GAN/wgan/images/mnist_%d.png" % epoch)
+        fig.savefig("Keras-GAN/wgan/images/%s_%d.png" % (self.dataset, epoch))
         plt.close()
 
         return gen_imgs
@@ -346,10 +406,10 @@ class WGAN():
         save(self.critic, "discriminator_"+str(self.dataset))
 
 if __name__ == '__main__':
-    wgan = WGAN()
+    wgan = WGAN(dataset='cifar10')
 
-    wgan.train(epochs=4000, batch_size=32, sample_interval=5)
-    # wgan.train(epochs=40000, batch_size=32, sample_interval=50)
+    # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
+    wgan.train(epochs=40000, batch_size=32, sample_interval=500)
     wgan.save_model()
 
     # wgan.load_model()
