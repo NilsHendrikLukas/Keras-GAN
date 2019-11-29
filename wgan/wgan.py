@@ -9,6 +9,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model
 from keras.optimizers import Adam, RMSprop
+from functools import partial
 
 import matplotlib.pyplot as plt
 
@@ -24,6 +25,7 @@ sys.path.append('Keras-GAN')
 from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
 class WGAN():
     def __init__(self,
+                 private=False,
                  n_samples=5000,
                  linspace_triplets_logan=(0, 200, 300),
                  log_logan_mia=False,
@@ -47,6 +49,7 @@ class WGAN():
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.latent_dim = 100
 
+        self.private = private
         self.log_logan_mia = log_logan_mia
         self.log_dist_mia = log_dist_mia
         self.featuremap_mia_epochs=featuremap_mia_epochs
@@ -62,24 +65,31 @@ class WGAN():
         self.clip_value = 0.01
         optimizer = RMSprop(lr=0.00005)
 
+
         # Build and compile the critic
-        self.critic = self.build_critic()
+        self.critic_model = self.build_critic()
+        img = Input(shape=self.img_shape)
+        validity = self.critic_model(img)
+        self.critic =  Model(img, validity)
+
         self.critic.compile(loss=self.wasserstein_loss,
             optimizer=optimizer,
             metrics=['accuracy'])
 
+
         # Build the generator
         self.generator = self.build_generator()
 
+
         # The generator takes noise as input and generated imgs
         z = Input(shape=(self.latent_dim,))
-        img = self.generator(z)
+        img_g = self.generator(z)
 
         # For the combined model we will only train the generator
         self.critic.trainable = False
 
         # The critic takes generated images as input and determines validity
-        valid = self.critic(img)
+        valid = self.critic(img_g)
 
         # The combined model  (stacked generator and critic)
         self.combined = Model(z, valid)
@@ -89,7 +99,7 @@ class WGAN():
 
 
         # Load the dataset
-        (self.X_train, _), (X_test, _) = cifar10.load_data()
+        (self.X_train, _), (self.X_test, _) = cifar10.load_data()
         # (self.X_train, _), (X_test, _) = mnist.load_data()
         # Rescale 0 to 1
         self.X_train = (self.X_train - 127.5) / 127.5
@@ -97,14 +107,63 @@ class WGAN():
         #MNIST only
         # self.X_train = np.expand_dims(self.X_train, axis=3)
 
+        self.mi_attacker_model = self.build_attacker()
+        logits = Input(shape=(10,))
+        inference = self.mi_attacker_model(logits)
+        self.mi_attacker = Model(logits,inference)
+        self.mi_attacker.compile(optimizer="Adam",
+                                         metrics=["accuracy"],
+                                         loss="binary_crossentropy")
+
+
+        # img2 = Input(shape=self.img_shape)
+        # validity2 = self.critic(img)
+        membership = Input(shape=(1,))
+        partial_reg_loss = partial(self.adv_reg_loss,
+                    inference=membership)
+        partial_reg_loss.__name__ = 'mia_penalty' # Keras requires function names
+        self.combined_critic = Model(inputs=[img, membership], outputs=validity)
+        self.combined_critic.compile(loss=partial_reg_loss, optimizer="Adam")
+
+
         self.logit_discriminator = None
         self.gan_discriminator = None
         self.featuremap_discriminator = None
         self.featuremap_attacker = None
 
-
     def wasserstein_loss(self, y_true, y_pred):
         return K.mean(y_true * y_pred)
+
+
+    def adv_reg_loss(self, y_true, y_pred, inference):
+        alpha = 0.9
+
+        priv_diff = inference - K.ones(K.shape(inference))
+        privacy_loss = K.pow(priv_diff, 2)
+        
+        return K.mean(y_true * y_pred) + alpha*K.mean(privacy_loss)
+
+
+    def build_attacker(self):
+
+        model = Sequential()
+        model.name = "featuremap_mia"
+
+        model.add(Dense(input_shape=(10,), units=500))
+        model.add(Dropout(0.2))
+        model.add(Dense(units=250))
+        model.add(Dropout(0.2))
+        model.add(Dense(units=10))
+        model.add(Dense(units=1, activation="sigmoid"))
+
+        # featuremap_attacker.fit(np.concatenate((y_pred_in, y_pred_out), axis=0),
+        #                         np.concatenate((np.zeros(len(y_pred_in)), np.ones(len(y_pred_out)))),
+        #                         validation_data=validation_data,
+        #                         epochs=epochs,
+        #                         verbose=0)
+
+        return model
+
 
     def build_generator(self):
 
@@ -152,6 +211,8 @@ class WGAN():
         img = model(noise)
 
         return Model(noise, img)
+
+
 
     def build_critic(self):
 
@@ -214,10 +275,12 @@ class WGAN():
 
         model.summary()
 
-        img = Input(shape=self.img_shape)
-        validity = model(img)
+        return model
 
-        return Model(img, validity)
+        # img = Input(shape=self.img_shape)
+        # validity = model(img)
+
+        # return Model(img, validity)
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
@@ -227,39 +290,85 @@ class WGAN():
 
         for epoch in range(epochs):
 
-            for _ in range(self.n_critic):
+
+            if not self.private:
+                    
+                # ---------------------
+                #  Train Discriminator
+                # ---------------------
+            
+                for _ in range(self.n_critic):
+
+
+                    # Select a random batch of images
+                    idx = np.random.randint(0, self.n_samples, batch_size)
+                    imgs = self.X_train[idx]
+                    
+                    # Sample noise as generator input
+                    noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+
+                    # Generate a batch of new images
+                    gen_imgs = self.generator.predict(noise)
+
+                    # Train the critic
+                    d_loss_real = self.critic.train_on_batch(imgs, valid)
+                    d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
+                    d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
+
+                    # Clip critic weights
+                    for l in self.critic.layers:
+                        weights = l.get_weights()
+                        weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
+                        l.set_weights(weights)
+
+
+                # ---------------------
+                #  Train Generator
+                # ---------------------
+
+                g_loss = self.combined.train_on_batch(noise, valid)
+
+
+            else:
+
 
                 # ---------------------
                 #  Train Discriminator
                 # ---------------------
-
-                # Select a random batch of images
-                idx = np.random.randint(0, self.n_samples, batch_size)
-                imgs = self.X_train[idx]
-                
-                # Sample noise as generator input
-                noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-
-                # Generate a batch of new images
-                gen_imgs = self.generator.predict(noise)
-
-                # Train the critic
-                d_loss_real = self.critic.train_on_batch(imgs, valid)
-                d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
-                d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
-
-                # Clip critic weights
-                for l in self.critic.layers:
-                    weights = l.get_weights()
-                    weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
-                    l.set_weights(weights)
+            
+                for _ in range(self.n_critic):
 
 
-            # ---------------------
-            #  Train Generator
-            # ---------------------
+                    # Select a random batch of images
+                    idx = np.random.randint(0, self.n_samples, batch_size)
+                    imgs = self.X_train[idx]
+                    
+                    # Sample noise as generator input
+                    noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
 
-            g_loss = self.combined.train_on_batch(noise, valid)
+                    # Generate a batch of new images
+                    gen_imgs = self.generator.predict(noise)
+
+                    ##(alpha)*(((inference_output-1.0).pow(2).mean()))
+
+                    # Train the critic
+                    d_loss_real = self.combined_critic.train_on_batch(imgs, valid)
+                    d_loss_fake = self.combined_critic.train_on_batch(gen_imgs, fake)
+                    d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
+
+                    # Clip critic weights
+                    for l in self.combined_critic.layers:
+                        weights = l.get_weights()
+                        weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
+                        l.set_weights(weights)
+
+
+                # ---------------------
+                #  Train Generator
+                # ---------------------
+
+                g_loss = self.combined.train_on_batch(noise, valid)
+
 
             # Plot the progress
             print ("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
@@ -279,7 +388,7 @@ class WGAN():
                 #### Added
 
                 self.execute_logan_mia()
-                #self.execute_dist_mia()
+                # self.execute_dist_mia()
                 # self.execute_featuremap_mia()
 
     def sample_images(self, epoch):
@@ -346,6 +455,7 @@ class WGAN():
 
         if self.featuremap_discriminator is None:
             self.featuremap_discriminator = self.get_featuremap_discriminator()
+
         self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator,
                                                   self.featuremap_attacker,
                                                   epochs=25,
@@ -406,11 +516,11 @@ class WGAN():
         save(self.critic, "discriminator_"+str(self.dataset))
 
 if __name__ == '__main__':
-    wgan = WGAN(dataset='cifar10')
+    wgan = WGAN(private=True, dataset='cifar10')
 
     # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
-    wgan.train(epochs=40000, batch_size=32, sample_interval=500)
-    wgan.save_model()
+    wgan.train(epochs=40000, batch_size=32, sample_interval=5)
+    # wgan.save_model()
 
     # wgan.load_model()
     # n = 500
