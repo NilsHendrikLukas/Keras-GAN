@@ -21,7 +21,7 @@ def featuremap_mia(featuremap_discriminator,
     """
 
     y_pred_in, y_pred_out = featuremap_discriminator.predict(x_in), featuremap_discriminator.predict(x_out)
-    y_val_in, y_val_out = featuremap_discriminator.predict(x_in), featuremap_discriminator.predict(x_out)
+    y_val_in, y_val_out = featuremap_discriminator.predict(val_in), featuremap_discriminator.predict(val_out)
 
     def train_discriminator(y_pred_in,
                             y_pred_out,
@@ -161,7 +161,7 @@ def logan_mia(logit_model,
         print("[LOGAN] X_in mean: {} X_out mean: {}".format(np.mean(y_pred_in), np.mean(y_pred_out)))
 
     # Get the accuracy for both approaches
-    x = np.linspace(min(y_pred_in + y_pred_out), max(y_pred_in+y_pred_out), 1000)
+    x = np.linspace(min(min(y_pred_in),min(y_pred_out)), max(max(y_pred_in)+max(y_pred_out)), 1000)
 
     y_acc = []  # Total accuracy per threshold
     y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
