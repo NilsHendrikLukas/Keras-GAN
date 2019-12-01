@@ -166,8 +166,8 @@ def logan_mia(logit_model,
     y_acc = []  # Total accuracy per threshold
     y_sel = []  # Ratio of dataset that has a confidence score greater than threshold
     for thresh in x:
-        accuracy_in = np.where(y_pred_in <= thresh)[0]  # Correctly captured
-        accuracy_out = np.where(y_pred_out > thresh)[0]  # Correctly captured
+        accuracy_in = np.where(y_pred_in >= thresh)[0]  # Correctly captured
+        accuracy_out = np.where(y_pred_out < thresh)[0]  # Correctly captured
         selected_samples = np.where((np.concatenate((y_pred_in, y_pred_out), axis=0) >= thresh))[0]
 
         total_acc = (len(accuracy_in) + len(accuracy_out)) / (len(y_pred_in) + len(y_pred_out))

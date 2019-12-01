@@ -125,13 +125,13 @@ class WGAN():
         # partial_reg_loss.__name__ = 'mia_penalty' # Keras requires function names
         self.featuremap_discriminator = None
         self.featuremap_discriminator = self.get_featuremap_discriminator()
-        self.featuremap_discriminator.treinable = False
+    
         img = Input(shape=self.img_shape)
         valid = self.critic(img)
         logits = self.featuremap_discriminator(img)
         inference2 = self.mi_attacker(logits)
         self.combined_critic = Model(inputs=[img], outputs=[valid,inference2])
-        self.combined_critic.compile(loss=[self.wasserstein_loss,self.wasserstein_loss], optimizer="Adam")
+        self.combined_critic.compile(loss=[self.wasserstein_loss,self.wasserstein_loss], optimizer="Adam", loss_weights=[1,1])
 
 
         self.logit_discriminator = None
