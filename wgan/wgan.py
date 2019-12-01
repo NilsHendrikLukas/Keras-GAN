@@ -41,6 +41,7 @@ class WGAN():
         self.img_rows = 32
         self.img_cols = 32
         self.channels = 3
+        self.logit_dim = 2048
         # MNIST
         # self.img_rows = 28
         # self.img_cols = 28
@@ -135,21 +136,21 @@ class WGAN():
         return K.mean(y_true * y_pred)
 
 
-    def adv_reg_loss(self, y_true, y_pred, inference):
-        alpha = 0.9
+    def adv_reg_loss(self, y_true, y_pred):
+        # alpha = 0.9
 
-        priv_diff = inference - K.ones(K.shape(inference))
-        privacy_loss = K.pow(priv_diff, 2)
+        # priv_diff = inference - K.ones(K.shape(inference))
+        # privacy_loss = K.pow(priv_diff, 2)
         
-        return K.mean(y_true * y_pred) + alpha*K.mean(privacy_loss)
-
+        # return alpha*K.mean(privacy_loss) + K.mean(y_true * y_pred)
+        return K.mean(y_true * y_pred)
 
     def build_attacker(self):
 
         model = Sequential()
         model.name = "featuremap_mia"
 
-        model.add(Dense(input_shape=(10,), units=500))
+        model.add(Dense(input_shape=(self.logit_dim,), units=500))
         model.add(Dropout(0.2))
         model.add(Dense(units=250))
         model.add(Dropout(0.2))
@@ -262,7 +263,7 @@ class WGAN():
         model.add(LeakyReLU(alpha=0.2))
         # model.add(Dropout(0.25))
         # Conv 4
-        model.add(Conv2D(512, kernel_size=5, strides=2, padding="same"))
+        model.add(Conv2D(self.logit_dim//4, kernel_size=5, strides=2, padding="same"))
         model.add(BatchNormalization())
         model.add(LeakyReLU(alpha=0.2))
         # model.add(Dropout(0.25))
@@ -349,11 +350,13 @@ class WGAN():
                     # Generate a batch of new images
                     gen_imgs = self.generator.predict(noise)
 
-                    ##(alpha)*(((inference_output-1.0).pow(2).mean()))
-
                     # Train the critic
-                    d_loss_real = self.combined_critic.train_on_batch(imgs, valid)
-                    d_loss_fake = self.combined_critic.train_on_batch(gen_imgs, fake)
+                    mia_loss_real = self.combined_critic.train_on_batch(imgs, valid)
+                    mia_loss_fake = self.combined_critic.train_on_batch(gen_imgs, fake)
+                    mia_loss = 0.5 * np.add(mia_loss_fake, mia_loss_real)
+
+                    d_loss_real = self.critic.train_on_batch(imgs, valid)
+                    d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
 
                     # Clip critic weights
