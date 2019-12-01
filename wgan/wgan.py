@@ -104,6 +104,8 @@ class WGAN():
         # (self.X_train, _), (X_test, _) = mnist.load_data()
         # Rescale 0 to 1
         self.X_train = (self.X_train - 127.5) / 127.5
+        self.X_out = self.X_train[self.n_samples:self.n_samples + self.n_samples]
+        self.X_train = self.X_train[:self.n_samples]
 
         #MNIST only
         # self.X_train = np.expand_dims(self.X_train, axis=3)
@@ -115,7 +117,7 @@ class WGAN():
         self.mi_attacker = Model(inputs=[fake_logits],outputs=[inference])
         self.mi_attacker.compile(optimizer="Adam",
                                          metrics=["accuracy"],
-                                         loss="binary_crossentropy")
+                                         loss=self.adv_reg_loss)
 
         # partial_reg_loss = partial(self.adv_reg_loss,
         #             inference=membership)
@@ -124,15 +126,16 @@ class WGAN():
         self.featuremap_discriminator = self.get_featuremap_discriminator()
         self.featuremap_discriminator.treinable = False
         img = Input(shape=self.img_shape)
+        valid = self.critic(img)
         logits = self.featuremap_discriminator(img)
         inference2 = self.mi_attacker(logits)
-        self.combined_critic = Model(inputs=[img], outputs=[inference2])
-        self.combined_critic.compile(loss=self.adv_reg_loss, optimizer="Adam")
+        self.combined_critic = Model(inputs=[img], outputs=[valid,inference2])
+        self.combined_critic.compile(loss=[self.wasserstein_loss,self.wasserstein_loss], optimizer="Adam")
 
 
         self.logit_discriminator = None
         self.gan_discriminator = None
-        self.featuremap_discriminator = None
+        # self.featuremap_discriminator = None
         self.featuremap_attacker = None
 
     def wasserstein_loss(self, y_true, y_pred):
@@ -146,7 +149,7 @@ class WGAN():
         # privacy_loss = K.pow(priv_diff, 2)
         
         # return alpha*K.mean(privacy_loss) + K.mean(y_true * y_pred)
-        return K.mean(y_true * y_pred)
+        return -K.mean(y_true * y_pred)
 
     def build_attacker(self):
 
@@ -344,8 +347,13 @@ class WGAN():
 
 
                     # Select a random batch of images
-                    idx = np.random.randint(0, self.n_samples, batch_size)
-                    imgs = self.X_train[idx]
+                    idx_in, idx_out = np.random.randint(0, self.n_samples, batch_size) , \
+                                        np.random.randint(0, self.n_samples, batch_size)
+                    imgs_in = self.X_train[idx_in]
+                    imgs_out = self.X_out[idx_out]
+
+                    logits_in = self.featuremap_discriminator.predict(imgs_in) 
+                    logits_out = self.featuremap_discriminator.predict(imgs_out)
                     
                     # Sample noise as generator input
                     noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
@@ -353,14 +361,17 @@ class WGAN():
                     # Generate a batch of new images
                     gen_imgs = self.generator.predict(noise)
 
-                    # Train the critic
-                    mia_loss_real = self.combined_critic.train_on_batch(imgs, valid)
-                    mia_loss_fake = self.combined_critic.train_on_batch(gen_imgs, fake)
-                    mia_loss = 0.5 * np.add(mia_loss_fake, mia_loss_real)
 
-                    d_loss_real = self.critic.train_on_batch(imgs, valid)
-                    d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
-                    d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
+                    mia_loss_real = self.mi_attacker.train_on_batch(logits_in, valid)
+                    mia_loss_fake = self.mi_attacker.train_on_batch(logits_out, fake)
+                    mia_loss = 0.5 * np.add(mia_loss_real, mia_loss_fake)
+
+                    # Train the critic
+                    d_loss_real = self.combined_critic.train_on_batch(imgs_in, [valid, valid])
+                    d_loss_fake = self.combined_critic.train_on_batch(gen_imgs, [fake, valid])
+                    d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+
+ 
 
                     # Clip critic weights
                     for l in self.combined_critic.layers:
@@ -393,7 +404,7 @@ class WGAN():
                 overfit_discriminator(0)
                 #### Added
 
-                self.execute_logan_mia()
+                # self.execute_logan_mia()
                 # self.execute_dist_mia()
                 # self.execute_featuremap_mia()
 
