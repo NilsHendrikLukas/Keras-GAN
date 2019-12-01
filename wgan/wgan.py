@@ -109,22 +109,25 @@ class WGAN():
         # self.X_train = np.expand_dims(self.X_train, axis=3)
 
         self.mi_attacker_model = self.build_attacker()
-        logits = Input(shape=(10,))
-        inference = self.mi_attacker_model(logits)
-        self.mi_attacker = Model(logits,inference)
+        # logits = self.critic.layers[-1].layers[-2].input #Input(shape=(10,))
+        fake_logits = Input(shape=(self.logit_dim,))
+        inference = self.mi_attacker_model(fake_logits)
+        self.mi_attacker = Model(inputs=[fake_logits],outputs=[inference])
         self.mi_attacker.compile(optimizer="Adam",
                                          metrics=["accuracy"],
                                          loss="binary_crossentropy")
 
-
-        # img2 = Input(shape=self.img_shape)
-        # validity2 = self.critic(img)
-        membership = Input(shape=(1,))
-        partial_reg_loss = partial(self.adv_reg_loss,
-                    inference=membership)
-        partial_reg_loss.__name__ = 'mia_penalty' # Keras requires function names
-        self.combined_critic = Model(inputs=[img, membership], outputs=validity)
-        self.combined_critic.compile(loss=partial_reg_loss, optimizer="Adam")
+        # partial_reg_loss = partial(self.adv_reg_loss,
+        #             inference=membership)
+        # partial_reg_loss.__name__ = 'mia_penalty' # Keras requires function names
+        self.featuremap_discriminator = None
+        self.featuremap_discriminator = self.get_featuremap_discriminator()
+        self.featuremap_discriminator.treinable = False
+        img = Input(shape=self.img_shape)
+        logits = self.featuremap_discriminator(img)
+        inference2 = self.mi_attacker(logits)
+        self.combined_critic = Model(inputs=[img], outputs=[inference2])
+        self.combined_critic.compile(loss=self.adv_reg_loss, optimizer="Adam")
 
 
         self.logit_discriminator = None
