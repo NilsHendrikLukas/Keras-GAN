@@ -404,7 +404,7 @@ class WGAN():
                 overfit_discriminator(0)
                 #### Added
 
-                # self.execute_logan_mia()
+                self.execute_logan_mia()
                 # self.execute_dist_mia()
                 # self.execute_featuremap_mia()
 
@@ -492,15 +492,15 @@ class WGAN():
             file_.write("\n")
 
     def execute_logan_mia(self):
-        n = 500
+        n = 1000
         n_val = 500     # Samples used ONLY in validation
         val_in, val_out = self.X_train[:n_val], \
-                          self.X_train[self.n_samples:self.n_samples+n_val]
+                          self.X_test[:n_val]
 
-        train_in = self.X_train[n_val:self.n_samples+n_val]
-        train_out = self.X_train[self.n_samples+n_val:self.n_samples+n_val+len(train_in)]
+        train_in = self.X_train[n_val:n_val+n_val]
+        train_out = self.X_test[n_val:n_val+len(train_in)]
         train_in, train_out = shuffle(train_in, train_out)
-        train_in, train_out = train_in[:n], train_out[:n]
+
 
         max_acc = logan_mia(self.get_logit_discriminator(), train_in, train_out)
 
