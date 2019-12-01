@@ -104,6 +104,7 @@ class WGAN():
         # (self.X_train, _), (X_test, _) = mnist.load_data()
         # Rescale 0 to 1
         self.X_train = (self.X_train - 127.5) / 127.5
+        self.X_test = (self.X_test - 127.5) / 127.5
         self.X_out = self.X_train[self.n_samples:self.n_samples + self.n_samples]
         self.X_train = self.X_train[:self.n_samples]
 
