@@ -141,6 +141,8 @@ class WassersteinGAN(object):
                 self.d_loss_store.append(rd_loss)  # d_loss will increase
                 self.wdis_store.append(rd_loss)  # Wasserstein distance will decrease
 
+                print("Wasserstein Distance :{}".format(self.wdis_store[-1]))
+
                 # generate image
                 bz = self.z_sampler(1, self.z_dim)  # changed, only generate 1 image
                 bx = self.sess.run(self.x_, feed_dict={self.z: bz})  # bx.shape: (1, 784)
