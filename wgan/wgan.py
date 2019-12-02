@@ -286,8 +286,6 @@ class WGAN():
         # Output
         model.add(Dense(1, activation='sigmoid'))
 
-
-
         model.summary()
 
         return model
