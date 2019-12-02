@@ -9,10 +9,10 @@ def leaky_relu(x, alpha=0.1):
 class Discriminator(object):
     def __init__(self):
         self.x_dim = 784
-        self.name = 'mnist/mlp/d_net'
+        self.name = 'mnist_models/mlp/d_net'
 
     def __call__(self, x, reuse=True):
-        with tf.variable_scope(self.name) as vs: # all variable below are prefixed with self.name = 'mnist/mlp/d_net'
+        with tf.variable_scope(self.name) as vs: # all variable below are prefixed with self.name = 'mnist_models/mlp/d_net'
             if reuse:
                 vs.reuse_variables()
             bs = tf.shape(x)[0] # batch size
@@ -51,7 +51,7 @@ class Generator(object):
     def __init__(self):
         self.z_dim = 100
         self.x_dim = 784
-        self.name = 'mnist/mlp/g_net'
+        self.name = 'mnist_models/mlp/g_net'
 
     def __call__(self, z):
         with tf.variable_scope(self.name) as vs:

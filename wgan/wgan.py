@@ -34,7 +34,7 @@ class WGAN():
                  linspace_triplets_dist=(1800, 2300, 1000),
                  log_dist_mia=False,
                  load_model=False,
-                 dataset='mnist'):
+                 dataset='mnist_models'):
 
         # Input shape
         # CIFAR
@@ -100,7 +100,7 @@ class WGAN():
 
         # Load the dataset
         (self.X_train, _), (self.X_test, _) = cifar10.load_data()
-        # (self.X_train, _), (X_test, _) = mnist.load_data()
+        # (self.X_train, _), (X_test, _) = mnist_models.load_data()
         # Rescale 0 to 1
         self.X_train = (self.X_train - 127.5) / 127.5
         self.X_test = (self.X_test - 127.5) / 127.5

@@ -8,6 +8,8 @@ import tensorflow as tf
 import tensorflow.contrib as tc
 from tensorflow.keras.datasets import mnist as mnist_db
 
+from dpgan.datasampler import DataSampler, NoiseSampler
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle
@@ -189,11 +191,11 @@ class WassersteinGAN(object):
 
 
 def train_on_mnist():
-    data = mnist
-    model = importlib.import_module("mnist.mlp")
+    model = importlib.import_module("mnist_models.mlp")
 
-    xs = data.DataSampler()
-    zs = data.NoiseSampler()
+
+    xs = DataSampler()
+    zs = NoiseSampler()
     d_net = model.Discriminator()
     g_net = model.Generator()
 
@@ -201,7 +203,7 @@ def train_on_mnist():
     for digit in digits:
         tf.reset_default_graph()
 
-        d_net = model.Discriminator()  # mnist/mlp.py, d_net is a instance of class Discriminator
+        d_net = model.Discriminator()  # mnist_models/mlp.py, d_net is a instance of class Discriminator
         g_net = model.Generator()
 
         sigma_all = 0  # total noise std added (800 before)
@@ -214,10 +216,10 @@ def train_on_mnist():
         save_size = 100000
         d_iters = 5
         data_name = 'training'
-        data_path = "/mnist/MNIST"
+        data_path = "/mnist_models/MNIST"
         path_output = "/"
 
-        wgan = WassersteinGAN(g_net, d_net, zs, "mnist", "mlp", sigma_all,
+        wgan = WassersteinGAN(g_net, d_net, zs, "mnist_models", "mlp", sigma_all,
                               digit, reg, lr, cilpc, batch_size, num_batches,
                               plot_size, save_size, d_iters, data_name, data_path,
                               path_output)
