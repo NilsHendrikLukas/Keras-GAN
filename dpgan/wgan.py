@@ -6,7 +6,7 @@ import time
 import matplotlib
 import tensorflow as tf
 import tensorflow.contrib as tc
-from tensorflow.keras.datasets import mnist
+from tensorflow.keras.datasets import mnist as mnist_db
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -46,7 +46,7 @@ class WassersteinGAN(object):
         self.data_path = data_path
         self.path_output = path_output
 
-        (self.data_td, self.label_td), (_, _) = mnist.load_data()
+        (self.data_td, self.label_td), (_, _) = mnist_db.load_data()
         self.data_td = np.reshape(self.data_td, (-1, 784))
 
         self.data_td = normlization(self.data_td)
