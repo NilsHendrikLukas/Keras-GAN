@@ -127,7 +127,7 @@ class WGAN():
         self.mi_attacker = Model(inputs=[fake_logits],outputs=[inference])
         self.mi_attacker.compile(optimizer="Adam",
                                          metrics=["accuracy"],
-                                         loss=self.adv_reg_loss)
+                                         loss=self.adv_reg_loss_neg)
 
         # partial_reg_loss = partial(self.adv_reg_loss,
         #             inference=membership)
@@ -140,7 +140,7 @@ class WGAN():
         logits = self.featuremap_discriminator(img)
         inference2 = self.mi_attacker(logits)
         self.combined_critic = Model(inputs=[img], outputs=[valid,inference2])
-        self.combined_critic.compile(loss=[self.wasserstein_loss,self.wasserstein_loss], optimizer="Adam", loss_weights=[1,1])
+        self.combined_critic.compile(loss=[self.wasserstein_loss,self.adv_reg_loss], optimizer="Adam", loss_weights=[1,1])
 
 
         self.logit_discriminator = None
@@ -151,15 +151,20 @@ class WGAN():
     def wasserstein_loss(self, y_true, y_pred):
         return K.mean(y_true * y_pred)
 
-
     def adv_reg_loss(self, y_true, y_pred):
-        # alpha = 0.9
+        alpha = 0.9
 
         # priv_diff = inference - K.ones(K.shape(inference))
-        # privacy_loss = K.pow(priv_diff, 2)
+        priv_diff = y_true - y_pred
+        privacy_loss = K.pow(priv_diff, 2)
         
-        # return alpha*K.mean(privacy_loss) + K.mean(y_true * y_pred)
-        return -K.mean(y_true * y_pred)
+        return -alpha*K.mean(privacy_loss)
+
+        # return -K.mean(y_true * y_pred)
+
+
+    def adv_reg_loss_neg(self, y_true, y_pred):
+        return - self.adv_reg_loss(y_true, y_pred)
 
     def build_attacker(self):
 
