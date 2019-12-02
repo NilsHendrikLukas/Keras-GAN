@@ -77,16 +77,6 @@ class WGAN():
             optimizer=optimizer,
             metrics=['accuracy'])
 
-        #Build critic copy
-        self.critic_cp = clone_model(self.critic)
-        self.critic_cp.set_weights(self.critic.get_weights())
-        self.critic_cp.compile(loss=self.wasserstein_loss,
-            optimizer=optimizer,
-            metrics=['accuracy'])
-
-
-
-
         # Build the generator
         self.generator = self.build_generator()
 
@@ -147,6 +137,9 @@ class WGAN():
         self.gan_discriminator = None
         # self.featuremap_discriminator = None
         self.featuremap_attacker = None
+
+        #Set random seed to 0
+        np.random.seed(0)
 
     def wasserstein_loss(self, y_true, y_pred):
         return K.mean(y_true * y_pred)
@@ -388,19 +381,7 @@ class WGAN():
                     d_loss_real = self.combined_critic.train_on_batch(imgs_in, [valid, valid])
                     d_loss_fake = self.combined_critic.train_on_batch(gen_imgs, [fake, valid])
                     d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
-
-                    d_cp_loss_real = self.critic_cp.train_on_batch(imgs_in, valid)
-                    d_cp_loss_fake = self.critic_cp.train_on_batch(gen_imgs, fake)
-                    d_cp_loss = 0.5 * np.add(d_cp_loss_real, d_cp_loss_fake)
-
  
-                     # Clip critic weights
-                    for l in self.critic_cp.layers:
-                        weights = l.get_weights()
-                        weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
-                        l.set_weights(weights)
-
-
                     # Clip critic weights
                     for l in self.combined_critic.layers:
                         weights = l.get_weights()
@@ -433,7 +414,6 @@ class WGAN():
                 #### Added
 
                 self.execute_logan_mia(self.critic)
-                self.execute_logan_mia(self.critic_cp)
                 # self.execute_dist_mia()
                 # self.execute_featuremap_mia()
 
@@ -469,13 +449,16 @@ class WGAN():
         return self.gan_discriminator
 
     def get_logit_discriminator(self, critic_model):
-        print("Logit discriminator")
+        # print("Logit discriminator")
+        self.logit_discriminator = None
         if self.logit_discriminator is None:
             feature_maps = critic_model.layers[-1].layers[-2].output
             new_logits = Dense(1)(feature_maps)
             self.logit_discriminator = Model(inputs=[critic_model.layers[1].get_input_at(0)], outputs=[new_logits])
             self.logit_discriminator.name = "logit_discriminator"
         self.logit_discriminator.layers[-1].set_weights(critic_model.layers[-1].layers[-1].get_weights())
+
+        print(critic_model.get_weights())
         return self.logit_discriminator
 
     def get_featuremap_discriminator(self):
@@ -562,7 +545,7 @@ class WGAN():
         save(self.critic, "discriminator_"+str(self.dataset))
 
 if __name__ == '__main__':
-    wgan = WGAN(private=True, dataset='cifar10')
+    wgan = WGAN(private=False, dataset='cifar10')
 
     # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
     wgan.train(epochs=40000, batch_size=32, sample_interval=5)
