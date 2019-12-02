@@ -155,7 +155,7 @@ def logan_mia(logit_model,
     # gan_disc_model = self.get_gan_discriminator()
     # y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
 
-    y_pred_in, y_pred_out = logit_model.predict(x_in), logit_model.predict(x_out)
+    y_pred_in, y_pred_out = np.absolute(logit_model.predict(x_in)), np.absolute(logit_model.predict(x_out))
 
     if verbose:
         print("[LOGAN] X_in mean: {} X_out mean: {}".format(np.mean(y_pred_in), np.mean(y_pred_out)))

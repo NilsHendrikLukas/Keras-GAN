@@ -7,7 +7,7 @@ from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, clone_model
 from keras.optimizers import Adam, RMSprop
 from functools import partial
 
@@ -76,6 +76,15 @@ class WGAN():
         self.critic.compile(loss=self.wasserstein_loss,
             optimizer=optimizer,
             metrics=['accuracy'])
+
+        #Build critic copy
+        self.critic_cp = clone_model(self.critic)
+        self.critic_cp.set_weights(self.critic.get_weights())
+        self.critic_cp.compile(loss=self.wasserstein_loss,
+            optimizer=optimizer,
+            metrics=['accuracy'])
+
+
 
 
         # Build the generator
@@ -335,6 +344,9 @@ class WGAN():
                 # ---------------------
 
                 g_loss = self.combined.train_on_batch(noise, valid)
+                
+                # Plot the progress
+                print ("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
 
 
             else:
@@ -372,7 +384,17 @@ class WGAN():
                     d_loss_fake = self.combined_critic.train_on_batch(gen_imgs, [fake, valid])
                     d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
+                    d_cp_loss_real = self.critic_cp.train_on_batch(imgs_in, valid)
+                    d_cp_loss_fake = self.critic_cp.train_on_batch(gen_imgs, fake)
+                    d_cp_loss = 0.5 * np.add(d_cp_loss_real, d_cp_loss_fake)
+
  
+                     # Clip critic weights
+                    for l in self.critic_cp.layers:
+                        weights = l.get_weights()
+                        weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
+                        l.set_weights(weights)
+
 
                     # Clip critic weights
                     for l in self.combined_critic.layers:
@@ -388,8 +410,8 @@ class WGAN():
                 g_loss = self.combined.train_on_batch(noise, valid)
 
 
-            # Plot the progress
-            print ("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
+                # Plot the progress
+                print ("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
@@ -405,7 +427,8 @@ class WGAN():
                 overfit_discriminator(0)
                 #### Added
 
-                self.execute_logan_mia()
+                self.execute_logan_mia(self.critic)
+                self.execute_logan_mia(self.critic_cp)
                 # self.execute_dist_mia()
                 # self.execute_featuremap_mia()
 
@@ -440,14 +463,14 @@ class WGAN():
         self.gan_discriminator.layers[-1].set_weights(self.critic.layers[-1].get_weights())
         return self.gan_discriminator
 
-    def get_logit_discriminator(self):
+    def get_logit_discriminator(self, critic_model):
         print("Logit discriminator")
         if self.logit_discriminator is None:
-            feature_maps = self.critic.layers[-1].layers[-2].output
+            feature_maps = critic_model.layers[-1].layers[-2].output
             new_logits = Dense(1)(feature_maps)
-            self.logit_discriminator = Model(inputs=[self.critic.layers[1].get_input_at(0)], outputs=[new_logits])
+            self.logit_discriminator = Model(inputs=[critic_model.layers[1].get_input_at(0)], outputs=[new_logits])
             self.logit_discriminator.name = "logit_discriminator"
-        self.logit_discriminator.layers[-1].set_weights(self.critic.layers[-1].layers[-1].get_weights())
+        self.logit_discriminator.layers[-1].set_weights(critic_model.layers[-1].layers[-1].get_weights())
         return self.logit_discriminator
 
     def get_featuremap_discriminator(self):
@@ -492,7 +515,7 @@ class WGAN():
             file_.write("{}".format(max_acc))
             file_.write("\n")
 
-    def execute_logan_mia(self):
+    def execute_logan_mia(self, critic_model):
         n = 1000
         n_val = 500     # Samples used ONLY in validation
         val_in, val_out = self.X_train[:n_val], \
@@ -503,7 +526,7 @@ class WGAN():
         train_in, train_out = shuffle(train_in, train_out)
 
 
-        max_acc = logan_mia(self.get_logit_discriminator(), train_in, train_out)
+        max_acc = logan_mia(self.get_logit_discriminator(critic_model), train_in, train_out)
 
         with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
             file_.write("{}".format(max_acc))
