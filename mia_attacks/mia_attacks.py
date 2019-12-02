@@ -140,6 +140,44 @@ def distance_mia(generator,
     return max_acc
 
 
+def logan_top_n(logit_model,
+              x_in,
+              x_out,
+              n,
+              plot_graph=False):
+
+    """
+    Membership inference attack with the LOGAN paper
+    @:param Model with logit output
+    @:param x_in The images in the dataset
+    @:param x_out The images out of the dataset
+    """
+    # Use class prediction output (not used in all GANs)
+    # gan_disc_model = self.get_gan_discriminator()
+    # y_pred_in, y_pred_out = np.abs(gan_disc_model.predict(x_in)), np.abs(gan_disc_model.predict(x_out))
+
+    y_pred_in, y_pred_out = (logit_model.predict(x_in)), (logit_model.predict(x_out))
+
+    y_pred = np.vstack([y_pred_in, y_pred_out])
+    i_sort = np.argsort(y_pred)
+
+    i_sort_pred = i_sort[-n:-1]
+
+    y_acc = len(np.where(i_sort_pred <= len(y_pred_in))[0]) / n
+
+    print("[LOGAN] Maximum Accuracy: {}".format(y_acc))
+
+    if plot_graph:
+        plt.title("[LOGAN] Membership Inference Accuracy")
+        plt.xlabel("Threshold")
+        plt.ylabel("Ratio")
+        plt.plot(x, y_acc, label="Membership Inference Accuracy")
+        plt.legend()
+        plt.show()
+
+    return y_acc
+
+
 def logan_mia(logit_model,
               x_in,
               x_out,

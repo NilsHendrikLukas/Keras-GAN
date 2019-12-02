@@ -22,7 +22,7 @@ from sklearn.utils import shuffle
 
 import sys
 sys.path.append('Keras-GAN')
-from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia
+from mia_attacks.mia_attacks import logan_mia, distance_mia, featuremap_mia, logan_top_n
 class WGAN():
     def __init__(self,
                  private=False,
@@ -451,7 +451,6 @@ class WGAN():
 
     def get_logit_discriminator(self, critic_model):
         # print("Logit discriminator")
-        self.logit_discriminator = None
         if self.logit_discriminator is None:
             feature_maps = critic_model.layers[-1].layers[-2].output
             new_logits = Dense(1)(feature_maps)
@@ -514,7 +513,8 @@ class WGAN():
         train_in, train_out = shuffle(train_in, train_out)
 
 
-        max_acc = logan_mia(self.get_logit_discriminator(critic_model), train_in, train_out)
+        # max_acc = logan_mia(self.get_logit_discriminator(critic_model), train_in, train_out)
+        max_acc = logan_top_n(self.get_logit_discriminator(critic_model), train_in, train_out, n_val//5)
 
         with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
             file_.write("{}".format(max_acc))
