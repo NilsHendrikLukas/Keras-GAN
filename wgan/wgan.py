@@ -514,7 +514,7 @@ class WGAN():
 
 
         # max_acc = logan_mia(self.get_logit_discriminator(critic_model), train_in, train_out)
-        max_acc = logan_top_n(self.get_logit_discriminator(critic_model), train_in, train_out, n_val//5)
+        max_acc = logan_top_n(self.get_logit_discriminator(critic_model), train_in, train_out, n_val//10)
 
         with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
             file_.write("{}".format(max_acc))

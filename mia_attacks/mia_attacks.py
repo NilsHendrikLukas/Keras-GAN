@@ -144,7 +144,8 @@ def logan_top_n(logit_model,
               x_in,
               x_out,
               n,
-              plot_graph=False):
+              plot_graph=False,
+              verbose=True):
 
     """
     Membership inference attack with the LOGAN paper
@@ -158,11 +159,14 @@ def logan_top_n(logit_model,
 
     y_pred_in, y_pred_out = (logit_model.predict(x_in)), (logit_model.predict(x_out))
 
+
+    if verbose:
+        print("[LOGAN] X_in mean: {} X_out mean: {}".format(np.mean(y_pred_in), np.mean(y_pred_out)))
+
     y_pred = np.vstack([y_pred_in, y_pred_out])
-    i_sort = np.argsort(y_pred)
+    i_sort = np.argsort(y_pred, axis=0)
 
-    i_sort_pred = i_sort[-n:-1]
-
+    i_sort_pred = i_sort[-n-1:-1]
     y_acc = len(np.where(i_sort_pred <= len(y_pred_in))[0]) / n
 
     print("[LOGAN] Maximum Accuracy: {}".format(y_acc))
