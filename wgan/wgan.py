@@ -433,7 +433,8 @@ class WGAN():
                 # axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("Keras-GAN/wgan/images/%s_%d.png" % (self.dataset, epoch))
+        private_str = 'private' if self.private else ''
+        fig.savefig("Keras-GAN/wgan/images/%s_%s_%d.png" % (self.dataset, private_str, epoch))
         plt.close()
 
         return gen_imgs
@@ -457,7 +458,7 @@ class WGAN():
             self.logit_discriminator = Model(inputs=[critic_model.layers[1].get_input_at(0)], outputs=[new_logits])
             self.logit_discriminator.name = "logit_discriminator"
         self.logit_discriminator.layers[-1].set_weights(critic_model.layers[-1].layers[-1].get_weights())
-        
+
         return self.logit_discriminator
 
     def get_featuremap_discriminator(self):
