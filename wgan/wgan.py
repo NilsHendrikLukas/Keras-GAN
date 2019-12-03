@@ -217,11 +217,14 @@ class WGAN():
                 If advreg is used, we have to pass x_in and x_out after training the discriminator 
                 """
                 if self.use_advreg:
+                    # Randomly sample target vector
+                    def sample_target(size):
+                        return 2*np.random.randint(0, 1, size)-1
                     # Train the critic to make the advreg model produce FAKE labels
-                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
-                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid])
+                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, sample_target(batch_size)])     # valid data
+                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, sample_target(batch_size)])
 
-                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
+                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, sample_target(batch_size)])
 
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
                 else:
