@@ -327,7 +327,7 @@ class WGAN():
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than X
         """
-        batch_size = 128
+        batch_size = 512
         idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
         x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
@@ -339,8 +339,6 @@ class WGAN():
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
         false_positives, = np.where(p >= len(y_preds_in))
-        print(true_positives)
-        print(false_positives)
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
         print("LOGAN Precision: {}".format(precision))
