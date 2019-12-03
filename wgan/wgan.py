@@ -133,6 +133,14 @@ class WGAN():
         featuremaps = Flatten()(l15)
         critic_out = Dense(1, name="critic_out")(featuremaps)
 
+        """ Build the critic WITHOUT the adversarial regularization
+                """
+        critic_model_without_advreg = Model(inputs=[critic_in], outputs=[critic_out])
+
+        critic_model_without_advreg.compile(optimizer=Adam(1e-3),
+                                            metrics=["accuracy"],
+                                            loss=self.wasserstein_loss)
+
         """ Build the adversarial regularizer
         If no adversarial regularization is required, disable it in the training function /!\
         """
@@ -165,14 +173,6 @@ class WGAN():
                            "critic_out": self.wasserstein_loss,
                            "mia_pred": self.wasserstein_loss
                        })
-
-        """ Build the critic WITHOUT the adversarial regularization
-        """
-        critic_model_without_advreg = Model(inputs=[critic_in], outputs=[critic_out])
-
-        critic_model_without_advreg.compile(optimizer=Adam(1e-3),
-                                         metrics=["accuracy"],
-                                         loss=self.wasserstein_loss)
 
         return featuremap_model, critic_model_without_advreg, critic_model_with_advreg, advreg_model
 
