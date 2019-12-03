@@ -39,8 +39,7 @@ class WGAN():
         #######################################
         # Load, normalize and split the dataset
         (self.x_train, _), (_, _) = mnist.load_data()
-        print(type(self.x_train))
-        self.x_train = np.reshape(self.x_train / 255, (-1, *self.img_shape))
+        self.x_train = np.reshape((self.x_train.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
 
         self.x_out = self.x_train[:n_out]  # 10K samples are out!
         self.x_train = self.x_train[n_out:]
