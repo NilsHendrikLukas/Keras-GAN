@@ -269,8 +269,6 @@ class WGAN():
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions)
                         plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
-
-
                     plt.ylim((0, 1))
                     plt.xlabel("Iterations")
                     plt.ylabel("Success")
@@ -377,7 +375,8 @@ class WGAN():
         y_preds_out = critic_model.predict(x_out)
 
         # Get 10% with highest confidence
-        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort(axis=0)[:int((len(y_preds_out)+len(y_preds_in))*threshold)]
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = p[-int((len(y_preds_out)+len(y_preds_in))*threshold):]
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
         false_positives, = np.where(p >= len(y_preds_in))
