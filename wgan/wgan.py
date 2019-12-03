@@ -337,9 +337,10 @@ class WGAN():
         # Get 10% with highest confidence
         p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort(axis=0)[:(len(y_preds_out)+len(y_preds_in))//10]
         # How many of the ones that are in are covered:
-        true_positives = np.where(p < len(y_preds_in))
-        false_positives = np.where(p >= len(y_preds_in))
-
+        true_positives, = np.where(p < len(y_preds_in))
+        false_positives, = np.where(p >= len(y_preds_in))
+        print(true_positives)
+        print(false_positives)
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
         print("LOGAN Precision: {}".format(precision))
