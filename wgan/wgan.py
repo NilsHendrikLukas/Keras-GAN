@@ -184,7 +184,7 @@ class WGAN():
 
     def train(self, epochs, batch_size=128, sample_interval=50):
         # Store all precision values
-        logan_precisions = []
+        logan_precisions, featuremap_precisions = [], []
 
         # Adversarial ground truths
         valid = -np.ones((batch_size, 1))
@@ -221,8 +221,6 @@ class WGAN():
 
                     adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
                     d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
-
-
                 else:
                     d_loss_real = self.critic_model.train_on_batch(imgs, valid)
                     d_loss_fake = self.critic_model.train_on_batch(gen_imgs, fake)
@@ -251,14 +249,16 @@ class WGAN():
                 precision = self.logan_mia(self.critic_model)
                 logan_precisions.append(precision)
                 log = log + "[LOGAN Prec: {:.3f}]".format(precision)
+            if "featuremap" in self.mia_attacks:
+                precision = self.featuremap_mia()
+                featuremap_precisions.append(precision)
+                log = log + "[FM Prec: {:.3f}]".format(precision)
 
             if self.use_advreg:
                 log = log + "[A loss: %f]" % (1 - d_loss_advreg[0])
 
             log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
             print(log)
-
-
 
             # If at save interval => save generated image samples
             if epoch != 0 and epoch % sample_interval == 0:
@@ -267,8 +267,11 @@ class WGAN():
                 # ---------------------
                 for attack in self.mia_attacks:
                     if attack == "logan":
-                        plt.plot(np.arange(len(logan_precisions)), logan_precisions)
+                        plt.plot(np.arange(len(logan_precisions)), logan_precisions, color="blue")
                         plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
+                    if attack =="featuremap":
+                        plt.plot(np.arange(len(featuremap_precisions)), featuremap_precisions, color="red")
+                        plt.hlines(0.5, 0, len(featuremap_precisions), linestyles="dashed")
                     plt.ylim((0, 1))
                     plt.xlabel("Iterations")
                     plt.ylabel("Success")
@@ -328,27 +331,40 @@ class WGAN():
         self.gan_discriminator.layers[-1].set_weights(self.critic_model.layers[-1].get_weights())
         return self.gan_discriminator
 
-    def execute_featuremap_mia(self):
-        n = 10000
-        n_val = 500  # Samples used only in validation
-        val_in, val_out = self.x_train[:n_val], \
-                          self.x_train[self.n_samples:self.n_samples + n_val]
+    def featuremap_mia(self, threshold=0.3):
+        """
+        Takes the classifiers featuremaps and predicts on them
+        """
+        test_size = 128
+        epochs = 5
+        batch_size = min(1024, len(self.x_train)-test_size)
 
-        train_in = self.x_train[n_val:self.n_samples + n_val]
-        train_out = self.x_train[self.n_samples + n_val:self.n_samples + n_val + len(train_in)]
-        train_in, train_out = shuffle(train_in, train_out)
-        train_in, train_out = train_in[:n], train_out[:n]
+        for e in range(epochs):
+            idx_in, idx_out = np.random.randint(test_size, len(self.x_train), batch_size), np.random.randint(test_size, len(self.x_out),
+                                                                                                     batch_size)
+            x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
-        if self.featuremap_discriminator is None:
-            self.featuremap_discriminator = self.get_featuremap_discriminator()
+            valid = -np.ones((batch_size, 1))
+            fake = np.ones((batch_size, 1))
+            d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
+            d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
-        self.featuremap_attacker = featuremap_mia(self.featuremap_discriminator,
-                                                  self.featuremap_attacker,
-                                                  epochs=25,
-                                                  x_in=train_in,
-                                                  x_out=train_out,
-                                                  val_in=val_in,
-                                                  val_out=val_out)
+        y_preds_in = self.advreg_model.predict(self.x_train[:test_size])
+        y_preds_out = self.advreg_model.predict(self.x_out[:test_size])
+
+        # Get 10% with highest confidence
+        p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
+
+        print("In: {}, Out: {}".format(np.mean(y_preds_in), np.mean(y_preds_out)))
+
+        p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+
+        # How many of the ones that are in are covered:
+        true_positives, = np.where(p < len(y_preds_in))
+        false_positives, = np.where(p >= len(y_preds_in))
+        precision = len(true_positives) / (len(true_positives) + len(false_positives))
+
+        return precision
 
     def execute_dist_mia(self):
         n = 50
@@ -415,7 +431,7 @@ class WGAN():
 
 
 if __name__ == '__main__':
-    wgan = WGAN(use_advreg=False, mia_attacks=["logan"])
+    wgan = WGAN(use_advreg=False, mia_attacks=["featuremap", "logan"])
 
     # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
     wgan.train(epochs=40000, batch_size=32, sample_interval=5)
