@@ -258,7 +258,7 @@ class WGAN():
                 overfit_discriminator(0)
                 #### Added
 
-                self.execute_logan_mia(self.critic_model)
+                # self.execute_logan_mia(self.critic_model)
                 # self.execute_dist_mia()
                 # self.execute_featuremap_mia()
 
@@ -329,10 +329,10 @@ class WGAN():
         n = 1000
         n_val = 500  # Samples used ONLY in validation
         val_in, val_out = self.x_train[:n_val], \
-                          self.X_test[:n_val]
+                          self.x_out[:n_val]
 
         train_in = self.x_train[n_val:n_val + n_val]
-        train_out = self.X_test[n_val:n_val + len(train_in)]
+        train_out = self.x_out[n_val:n_val + len(train_in)]
         train_in, train_out = shuffle(train_in, train_out)
 
         # max_acc = logan_mia(self.get_logit_discriminator(critic_model), train_in, train_out)
