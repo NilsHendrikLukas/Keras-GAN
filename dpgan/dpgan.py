@@ -49,7 +49,7 @@ class DPGAN():
         optimizer = RMSprop(lr=0.00005)
 
         # Build and compile the critic
-        self.critic = self.build_critic(noisyoptimizer)
+        self.critic = self.build_critic(optimizer)
 
         # Build the generator
         self.generator = build_generator()
