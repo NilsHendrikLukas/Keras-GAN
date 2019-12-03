@@ -54,7 +54,7 @@ class WGAN():
 
         #########################################
         # Build and compile the critic and generator
-        self.n_critic = 5
+        self.n_critic = 15
         self.clip_value = 0.01
         optimizer = RMSprop(lr=0.00005)
 
@@ -220,7 +220,8 @@ class WGAN():
                     # Train the critic to make the advreg model produce FAKE labels
                     d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
                     d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake])
-                    d_loss_real_out = self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, fake])
+
+                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, fake])
 
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
                 else:
@@ -422,10 +423,9 @@ class WGAN():
 
         p = p[-int((len(y_preds_out)+len(y_preds_in))*threshold):]
 
-
         # How many of the ones that are in are covered:
-        true_positives, = np.where(p < len(y_preds_in))
         false_positives, = np.where(p >= len(y_preds_in))
+        true_positives, = np.where(p < len(y_preds_in))
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
         return precision
