@@ -374,6 +374,10 @@ class WGAN():
         y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
+        # -1 means in, 1 means out
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
+
         # Get 10% with highest confidence
         p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
 
