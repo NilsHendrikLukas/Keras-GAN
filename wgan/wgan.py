@@ -73,7 +73,7 @@ class WGAN():
                               metrics=['accuracy'])
 
     def wasserstein_loss(self, y_true, y_pred):
-        return K.mean(y_true * y_pred)
+        return -K.mean(y_true * y_pred)
 
     def adv_reg_loss(self, y_true, y_pred):
         alpha = 0.9
