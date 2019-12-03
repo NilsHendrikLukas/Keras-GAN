@@ -54,7 +54,7 @@ class WGAN():
 
         #########################################
         # Build and compile the critic and generator
-        self.n_critic = 15
+        self.n_critic = 5
         self.clip_value = 0.01
         optimizer = RMSprop(lr=0.00005)
 
@@ -353,7 +353,7 @@ class WGAN():
         """
         Takes the classifiers featuremaps and predicts on them
         """
-        test_size = 1024
+        test_size = 128
         epochs = 5
         batch_size = min(2048, len(self.x_train))
 
@@ -379,11 +379,11 @@ class WGAN():
         print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         # Get 10% with highest confidence
-        p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
 
         print("In: {}, Out: {}".format(np.mean(y_preds_in), np.mean(y_preds_out)))
 
-        p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+        p = p[int((len(y_preds_out) + len(y_preds_in)) * threshold):]
 
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
