@@ -172,7 +172,7 @@ class DCGAN():
         featuremap_model.trainable = False
 
         def advreg(y_true, y_pred):
-            return 3*K.binary_crossentropy(y_true, y_pred)
+            return 2*K.binary_crossentropy(y_true, y_pred)
 
         advreg_model.compile(optimizer=optimizer,
                              metrics=["accuracy"],
@@ -328,10 +328,6 @@ class DCGAN():
 
         y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
-
-        # -1 means in, 1 means out
-        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
-        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         """
             True negatives
