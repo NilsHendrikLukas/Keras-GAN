@@ -335,11 +335,14 @@ class WGAN():
         y_preds_out = critic_model.predict(x_out)
 
         # Get 10% with highest confidence
-        p = np.concatenate((y_preds_in, y_preds_out)).argsort()[:(len(y_preds_out)+len(y_preds_in))//10]
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort(axis=0)[:(len(y_preds_out)+len(y_preds_in))//10]
         # How many of the ones that are in are covered:
-        idx_in = np.where(p < len(y_preds_in))
-        print(idx_in)
-        print("LOGAN ACC: {}".format(len(idx_in)/len(p)))
+        true_positives = np.where(p < len(y_preds_in))
+        false_positives = np.where(p >= len(y_preds_in))
+
+        precision = len(true_positives) / (len(true_positives) + len(false_positives))
+
+        print("LOGAN Precision: {}".format(precision))
 
     def load_model(self):
 
@@ -367,10 +370,10 @@ class WGAN():
 
 
 if __name__ == '__main__':
-    wgan = WGAN()
+    wgan = WGAN(mia_attacks=["logan"])
 
     # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
-    wgan.train(epochs=40000, batch_size=32, sample_interval=5, mia_attacks=["logan"])
+    wgan.train(epochs=40000, batch_size=32, sample_interval=5)
     # wgan.save_model()
 
     # wgan.load_model()
