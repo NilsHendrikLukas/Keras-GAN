@@ -246,7 +246,7 @@ class WGAN():
 
             log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
 
-            print(log, end="\r")
+            print(log)
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
