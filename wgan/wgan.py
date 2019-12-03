@@ -343,9 +343,9 @@ class WGAN():
         """
         Takes the classifiers featuremaps and predicts on them
         """
-        test_size = 128
+        test_size = 1024
         epochs = 5
-        batch_size = min(1024, len(self.x_train)-test_size)
+        batch_size = min(2048, len(self.x_train)-test_size)
 
         for e in range(epochs):
             idx_in  = np.random.randint(test_size, len(self.x_train), batch_size)
