@@ -169,7 +169,8 @@ class DPGAN():
         logan_precisions, featuremap_precisions = [], []
 
         # Adversarial ground truths
-        valid = np.ones((batch_size, 1))*0.9
+        soft_valid = np.ones((batch_size, 1))*0.9
+        valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
 
         for epoch in range(epochs):
@@ -189,14 +190,15 @@ class DPGAN():
             gen_imgs = self.generator.predict(noise)
 
             # Train the critic
-            d_loss_real = self.critic.train_on_batch(imgs, valid)
+            self.critic.treinable = True
+            d_loss_real = self.critic.train_on_batch(imgs, soft_valid)
             d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
             d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
 
             # ---------------------
             #  Train Generator
             # ---------------------
-
+            self.critic.treinable = False
             g_loss = self.combined.train_on_batch(noise, valid)
 
             # Plot the progress
