@@ -221,7 +221,7 @@ class WGAN():
                     d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
                     d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake])
 
-                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, fake])
+                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
 
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
                 else:
@@ -353,7 +353,7 @@ class WGAN():
         """
         Takes the classifiers featuremaps and predicts on them
         """
-        test_size = 128
+        test_size = 256
         epochs = 5
         batch_size = min(128, len(self.x_train))
 
