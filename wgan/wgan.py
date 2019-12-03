@@ -355,7 +355,7 @@ class WGAN():
         """
         test_size = 128
         epochs = 5
-        batch_size = min(2048, len(self.x_train))
+        batch_size = min(64, len(self.x_train))
 
         for e in range(epochs):
             idx_in  = np.random.randint(0, len(self.x_train), batch_size)
