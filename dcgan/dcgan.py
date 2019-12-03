@@ -231,14 +231,17 @@ class DCGAN():
                 d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
                 d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
 
-            def sample_target(size):
-                return np.random.randint(0, 2, size)
-            self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, sample_target(batch_size)])
+
             # ---------------------
             #  Train AdvReg
             #  Do this in the outer loop to give the discriminator a chance to adapt
             # ---------------------
             if self.use_advreg:
+                def sample_target(size):
+                    return np.random.randint(0, 2, size)
+
+                self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
+
                 idx_out = np.random.randint(0, len(self.x_out), batch_size)
                 imgs_out = self.x_out[idx_out]
 
