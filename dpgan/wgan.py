@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle
 from numpy import linalg, array, arange
-from dpgan.utilize import normlization, Rsample
+from utilize import normlization, Rsample
 import logging
 
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -199,12 +199,10 @@ class WassersteinGAN(object):
 
 
 def train_on_mnist():
-    model = importlib.import_module("mnist_models.mlp")
+    model = importlib.import_module("mnist_models")
 
 
     zs = NoiseSampler()
-    d_net = model.Discriminator()
-    g_net = model.Generator()
 
     digits = ['2', '3', '4', '5']  # MNIST digits need to use
     for digit in digits:
