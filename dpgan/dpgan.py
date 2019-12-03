@@ -7,6 +7,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
 from keras.optimizers import RMSprop, Adam
+from keras import initializers
 from gradient_noise import add_gradient_noise
 from mnist_models import build_generator, build_critic
 from emnist import extract_training_samples
@@ -56,7 +57,7 @@ class DPGAN():
         self.critic, self.advreg_model = self.build_critic(discriminator_optimizer, optimizer)
 
         # Build the generator
-        self.generator = build_generator()
+        self.generator = self.build_generator()
 
         # The generator takes noise as input and generated imgs
         z = Input(shape=(self.latent_dim,))
@@ -89,34 +90,44 @@ class DPGAN():
 
         return Model(advreg_in, advreg_out)
 
+    def build_generator(self):
+        random_dim = 100
+        generator = Sequential()
+        generator.add(Dense(256, input_dim=random_dim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(512))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(1024))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(28*28, activation='tanh'))
+        generator.add(Reshape((28, 28, 1), input_shape=(28*28,)))
+
+
+        generator_optimizer = Adam(lr=0.0002, beta_1=0.5)
+        generator.compile(optimizer=generator_optimizer, loss='binary_crossentropy')
+
+        return generator
 
     def build_critic(self, critic_optimizer, advreg_optimizer):
         """ Build the discriminators for MNIST with advreg
         """
         img_shape = (28, 28, 1)
 
-        dropout = 0 # 0.25
+        dropout = 0.3 # 0.25
 
         critic_in = Input(img_shape)
 
-        l0 = Conv2D(16, kernel_size=3, strides=2, input_shape=img_shape, padding="same")(critic_in)
+        l0 = Dense(1024, input_shape=img_shape, kernel_initializer=initializers.RandomNormal(stddev=0.02))(critic_in)
         l1 = LeakyReLU(alpha=0.2)(l0)
         l2 = Dropout(dropout)(l1)
-        l3 = Conv2D(32, kernel_size=3, strides=2, padding="same")(l2)
-        l4 = ZeroPadding2D(padding=((0, 1), (0, 1)))(l3)
-        l5 = BatchNormalization(momentum=0.8)(l4)
-        l6 = LeakyReLU(alpha=0.2)(l5)
-        l7 = Dropout(dropout)(l6)
-        l8 = Conv2D(64, kernel_size=3, strides=2, padding="same")(l7)
-        l9 = BatchNormalization(momentum=0.8)(l8)
-        l10 = LeakyReLU(alpha=0.2)(l9)
-        l11 = Dropout(dropout)(l10)
-        l12 = Conv2D(128, kernel_size=3, strides=1, padding="same")(l11)
-        l13 = BatchNormalization(momentum=0.8)(l12)
-        l14 = LeakyReLU(alpha=0.2)(l13)
-        l15 = Dropout(dropout)(l14)
-        featuremaps = Flatten()(l15)
-        critic_out = Dense(1, name="critic_out")(featuremaps)
+        l3 = Dense(512)(l2)
+        l4 = LeakyReLU(alpha=0.2)(l3)
+        l5 = Dropout(dropout)(l4)
+        l6 = Dense(256)(l5)
+        l7 = LeakyReLU(alpha=0.2)(l6)
+        l8 = Dropout(dropout)(l7)
+        featuremaps = Flatten()(l8)
+        critic_out = Dense(1, name="critic_out", activation='sigmoid')(featuremaps)
 
         """ Build the critic WITHOUT the adversarial regularization
                 """
@@ -133,7 +144,7 @@ class DPGAN():
         featuremap_model = Model(inputs=[critic_in], outputs=[featuremaps])
 
 
-        advreg = self.build_advreg(input_shape=(2048,))
+        advreg = self.build_advreg(input_shape=(256,))
         mia_pred = advreg(featuremap_model(critic_in))
 
         naming_layer = Lambda(lambda x: x, name='mia_pred')
