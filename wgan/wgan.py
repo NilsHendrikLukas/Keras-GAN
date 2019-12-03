@@ -367,7 +367,7 @@ class WGAN():
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than the passed value
         """
-        batch_size = min(1024, len(self.x_train))
+        batch_size = min(10, len(self.x_train))
         idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
         x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
@@ -375,8 +375,13 @@ class WGAN():
         y_preds_out = critic_model.predict(x_out)
 
         # Get 10% with highest confidence
-        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
+
+        print("In: {}, Out: {}, Sorting: {}".format(y_preds_in, y_preds_out, p))
+
         p = p[-int((len(y_preds_out)+len(y_preds_in))*threshold):]
+
+
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
         false_positives, = np.where(p >= len(y_preds_in))
