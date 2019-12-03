@@ -21,7 +21,10 @@ import numpy as np
 
 class DPGAN():
     def __init__(self,
-                 max_data=40000):
+                 max_data=40000,
+                 noise_eta=0.3,
+                 noise_gamma=0.55
+                 ):
         self.img_rows = 28
         self.img_cols = 28
         self.channels = 1
@@ -45,7 +48,7 @@ class DPGAN():
         self.n_critic = 5
         self.clip_value = 0.01
         NoisyRMSprop = add_gradient_noise(RMSprop)
-        noisyoptimizer = NoisyRMSprop(lr=0.00005, noise_eta=0.3, noise_gamma=0.55)
+        noisyoptimizer = NoisyRMSprop(lr=0.00005, noise_eta=noise_eta, noise_gamma=noise_gamma)
         optimizer = RMSprop(lr=0.00005)
 
         # Build and compile the critic
