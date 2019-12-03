@@ -8,7 +8,6 @@ import tensorflow as tf
 import tensorflow.contrib as tc
 from tensorflow.keras.datasets import mnist as mnist_db
 
-from dpgan.datasampler import DataSampler, NoiseSampler
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -20,6 +19,13 @@ import logging
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 import numpy as np
+
+
+class NoiseSampler(object):
+    def __call__(self, batch_size, z_dim):
+        return np.random.uniform(-1.0, 1.0, [batch_size, z_dim]) # "changed"
+        # the shape of return is: batch_size*z_dim
+
 
 
 class WassersteinGAN(object):
@@ -196,7 +202,6 @@ def train_on_mnist():
     model = importlib.import_module("mnist_models.mlp")
 
 
-    xs = DataSampler()
     zs = NoiseSampler()
     d_net = model.Discriminator()
     g_net = model.Generator()
