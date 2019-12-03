@@ -344,7 +344,7 @@ class WGAN():
         Takes the classifiers featuremaps and predicts on them
         """
         test_size = 128
-        epochs = 0
+        epochs = 5
         batch_size = min(1024, len(self.x_train)-test_size)
 
         for e in range(epochs):
