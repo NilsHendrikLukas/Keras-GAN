@@ -6,8 +6,8 @@ from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
-from keras.optimizers import RMSprop
-from keras_gradient_noise import add_gradient_noise
+from keras.optimizers import RMSprop, Adam
+from gradient_noise import add_gradient_noise
 from mnist_models import build_generator, build_critic
 from emnist import extract_training_samples
 
@@ -22,8 +22,7 @@ import numpy as np
 class DPGAN():
     def __init__(self,
                  max_data=40000,
-                 noise_eta=0.3,
-                 noise_gamma=0,
+                 noise_std=0.001,
                  mia_attacks=None,
                  ):
         self.img_rows = 28
@@ -48,13 +47,13 @@ class DPGAN():
 
         # Following parameter and optimizer set as recommended in paper
         self.n_critic = 5
-        self.clip_value = 0.01
-        NoisyRMSprop = add_gradient_noise(RMSprop)
-        noisyoptimizer = NoisyRMSprop(lr=0.00005, noise_eta=noise_eta, noise_gamma=noise_gamma)
+        self.clip_value = 5.0
+        NoisyAdam = add_gradient_noise(Adam)
+        discriminator_optimizer = NoisyAdam(lr=0.0002, beta_1=0.5, clipnorm=self.clip_value, standard_deviation=noise_std)
         optimizer = RMSprop(lr=0.00005)
 
         # Build and compile the critic
-        self.critic, self.advreg_model = self.build_critic(noisyoptimizer)
+        self.critic, self.advreg_model = self.build_critic(discriminator_optimizer, optimizer)
 
         # Build the generator
         self.generator = build_generator()
@@ -71,7 +70,7 @@ class DPGAN():
 
         # The combined model  (stacked generator and critic)
         self.combined = Model(z, valid)
-        self.combined.compile(loss=self.wasserstein_loss,
+        self.combined.compile(loss='binary_crossentropy',
             optimizer=optimizer,
             metrics=['accuracy'])
 
@@ -91,7 +90,7 @@ class DPGAN():
         return Model(advreg_in, advreg_out)
 
 
-    def build_critic(self, optimizer):
+    def build_critic(self, critic_optimizer, advreg_optimizer):
         """ Build the discriminators for MNIST with advreg
         """
         img_shape = (28, 28, 1)
@@ -123,9 +122,9 @@ class DPGAN():
                 """
         critic_model_without_advreg = Model(inputs=[critic_in], outputs=[critic_out])
 
-        critic_model_without_advreg.compile(optimizer=optimizer,
+        critic_model_without_advreg.compile(optimizer=critic_optimizer,
                                             metrics=["accuracy"],
-                                            loss=self.wasserstein_loss)
+                                            loss='binary_crossentropy')
 
 
         """ Build the adversarial regularizer
@@ -145,7 +144,7 @@ class DPGAN():
         # Do not train the critic when updating the adversarial regularizer
         featuremap_model.trainable = False
 
-        advreg_model.compile(optimizer=optimizer,
+        advreg_model.compile(optimizer=advreg_optimizer,
                        metrics=["accuracy"],
                        loss=self.wasserstein_loss)
 
@@ -159,38 +158,29 @@ class DPGAN():
         logan_precisions, featuremap_precisions = [], []
 
         # Adversarial ground truths
-        valid = -np.ones((batch_size, 1))
-        fake = np.ones((batch_size, 1))
+        valid = np.ones((batch_size, 1))*0.9
+        fake = np.zeros((batch_size, 1))
 
         for epoch in range(epochs):
 
-            for _ in range(self.n_critic):
+            # ---------------------
+            #  Train Discriminator
+            # ---------------------
 
-                # ---------------------
-                #  Train Discriminator
-                # ---------------------
+            # Select a random batch of images
+            idx = np.random.randint(0, self.x_train.shape[0], batch_size)
+            imgs = self.x_train[idx]
+            
+            # Sample noise as generator input
+            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
 
-                # Select a random batch of images
-                idx = np.random.randint(0, self.x_train.shape[0], batch_size)
-                imgs = self.x_train[idx]
-                
-                # Sample noise as generator input
-                noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+            # Generate a batch of new images
+            gen_imgs = self.generator.predict(noise)
 
-                # Generate a batch of new images
-                gen_imgs = self.generator.predict(noise)
-
-                # Train the critic
-                d_loss_real = self.critic.train_on_batch(imgs, valid)
-                d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
-                d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
-
-                # Clip critic weights
-                for l in self.critic.layers:
-                    weights = l.get_weights()
-                    weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
-                    l.set_weights(weights)
-
+            # Train the critic
+            d_loss_real = self.critic.train_on_batch(imgs, valid)
+            d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
+            d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
 
             # ---------------------
             #  Train Generator
@@ -397,5 +387,5 @@ class DPGAN():
 
 
 if __name__ == '__main__':
-    dpgan = DPGAN(noise_eta = 0.1, mia_attacks=["featuremap", "logan"])
+    dpgan = DPGAN(noise_std = 0.0001, mia_attacks=["featuremap", "logan"])
     dpgan.train(epochs=4000, batch_size=32, sample_interval=5)
