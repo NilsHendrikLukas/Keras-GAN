@@ -336,7 +336,9 @@ class WGAN():
 
         # Get 10% with highest confidence
         p = np.concatenate((y_preds_in, y_preds_out)).argsort()[:(len(y_preds_out)+len(y_preds_in))//10]
-        idx_in, = np.where(p < len(y_preds_in))
+        # How many of the ones that are in are covered:
+        idx_in = np.where(p < len(y_preds_in))
+        print(idx_in)
         print("LOGAN ACC: {}".format(len(idx_in)/len(p)))
 
     def load_model(self):
