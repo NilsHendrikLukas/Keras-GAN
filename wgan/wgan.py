@@ -283,7 +283,11 @@ class WGAN():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
                 axs[i, j].axis('off')
                 cnt += 1
-        fig.savefig("Keras-GAN/wgan/images/%d.png" % (epoch))
+        try:
+            fig.savefig("Keras-GAN/wgan/images/%d.png" % (epoch))
+        except:
+            pass
+
         plt.close()
 
         return gen_imgs
