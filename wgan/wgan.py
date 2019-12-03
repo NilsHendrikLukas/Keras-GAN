@@ -261,7 +261,7 @@ class WGAN():
 
 
             # If at save interval => save generated image samples
-            if epoch % sample_interval == 0:
+            if epoch != 0 and epoch % sample_interval == 0:
                 # ---------------------
                 #  Plot Statistics
                 # ---------------------
@@ -269,6 +269,7 @@ class WGAN():
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions)
 
+                    plt.ylim((0, 1))
                     plt.xlabel("Iterations")
                     plt.ylabel("Success")
                     plt.show()
@@ -359,10 +360,12 @@ class WGAN():
             file_.write("{}".format(max_acc))
             file_.write("\n")
 
-    def logan_mia(self, critic_model):
+    def logan_mia(self,
+                  critic_model,
+                   threshold=0.3):
         """
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
-        a threshold higher than X
+        a threshold higher than the passed value
         """
         batch_size = min(1024, len(self.x_train))
         idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
@@ -372,7 +375,7 @@ class WGAN():
         y_preds_out = critic_model.predict(x_out)
 
         # Get 10% with highest confidence
-        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort(axis=0)[:(len(y_preds_out)+len(y_preds_in))//10]
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort(axis=0)[:int((len(y_preds_out)+len(y_preds_in))*threshold)]
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
         false_positives, = np.where(p >= len(y_preds_in))
