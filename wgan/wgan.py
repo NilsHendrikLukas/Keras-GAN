@@ -210,17 +210,10 @@ class WGAN():
                 If advreg is used, we have to pass x_in and x_out after training the discriminator 
                 """
                 if self.use_advreg:
-                    # First train the critic
-                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])    # valid data, valid (is in the dataset)
-                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake]) # fake data, valid (is in the dataset)
+                    # Train the critic to make the advreg model produce FAKE labels
+                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])    # valid data
+                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake]) # fake data
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
-
-                    # Now update the advreg
-                    idx_out = np.random.randint(0, len(self.x_out), batch_size)
-                    imgs_out = self.x_out[idx_out]
-
-                    adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
-                    d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
                 else:
                     d_loss_real = self.critic_model.train_on_batch(imgs, valid)
                     d_loss_fake = self.critic_model.train_on_batch(gen_imgs, fake)
@@ -231,6 +224,19 @@ class WGAN():
                     weights = l.get_weights()
                     weights = [np.clip(w, -self.clip_value, self.clip_value) for w in weights]
                     l.set_weights(weights)
+
+            # ---------------------
+            #  Train AdvReg
+            # ---------------------
+
+            idx_out = np.random.randint(0, len(self.x_out), batch_size)
+            imgs_out = self.x_out[idx_out]
+
+            idx_in = np.random.randint(0, len(self.x_train), batch_size)
+            imgs = self.x_train[idx_in]
+
+            adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
+            d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
 
             # ---------------------
             #  Train Generator
