@@ -172,7 +172,7 @@ class DCGAN():
         featuremap_model.trainable = False
 
         def advreg(y_true, y_pred):
-            return 2*K.binary_crossentropy(y_true, y_pred)
+            return 3*K.binary_crossentropy(y_true, y_pred)
 
         advreg_model.compile(optimizer=optimizer,
                              metrics=["accuracy"],
