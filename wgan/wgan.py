@@ -211,8 +211,8 @@ class WGAN():
                 """
                 if self.use_advreg:
                     # Train the critic to make the advreg model produce FAKE labels
-                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])    # valid data
-                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake]) # fake data
+                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
+                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid])
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
                 else:
                     d_loss_real = self.critic_model.train_on_batch(imgs, valid)
@@ -227,16 +227,17 @@ class WGAN():
 
             # ---------------------
             #  Train AdvReg
+            #  Do this in the outer loop to give the discriminator a chance to adapt
             # ---------------------
+            if self.use_advreg:
+                idx_out = np.random.randint(0, len(self.x_out), batch_size)
+                imgs_out = self.x_out[idx_out]
 
-            idx_out = np.random.randint(0, len(self.x_out), batch_size)
-            imgs_out = self.x_out[idx_out]
+                idx_in = np.random.randint(0, len(self.x_train), batch_size)
+                imgs = self.x_train[idx_in]
 
-            idx_in = np.random.randint(0, len(self.x_train), batch_size)
-            imgs = self.x_train[idx_in]
-
-            adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
-            d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
+                adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
+                d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
 
             # ---------------------
             #  Train Generator
