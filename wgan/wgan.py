@@ -211,8 +211,8 @@ class WGAN():
                 """
                 if self.use_advreg:
                     # First train the critic
-                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, valid])    # valid data, valid (is in the dataset)
-                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid]) # fake data, valid (is in the dataset)
+                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])    # valid data, valid (is in the dataset)
+                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake]) # fake data, valid (is in the dataset)
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
 
                     # Now update the advreg
