@@ -268,6 +268,9 @@ class WGAN():
                 for attack in self.mia_attacks:
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions)
+                        plt.hlines(np.arange(len(logan_precisions)), [0.5]*len(logan_precisions),
+                                   linestyles="dashed")
+
 
                     plt.ylim((0, 1))
                     plt.xlabel("Iterations")
@@ -362,7 +365,7 @@ class WGAN():
 
     def logan_mia(self,
                   critic_model,
-                   threshold=0.3):
+                  threshold=0.3):
         """
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than the passed value
