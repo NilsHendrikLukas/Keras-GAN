@@ -349,7 +349,7 @@ class WGAN():
         self.gan_discriminator.layers[-1].set_weights(self.critic_model.layers[-1].get_weights())
         return self.gan_discriminator
 
-    def featuremap_mia(self, threshold=0.2):
+    def featuremap_mia(self, threshold=1):
         """
         Takes the classifiers featuremaps and predicts on them
         """
@@ -420,7 +420,7 @@ class WGAN():
 
     def logan_mia(self,
                   critic_model,
-                  threshold=0.3):
+                  threshold=1):
         """
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than the passed value
