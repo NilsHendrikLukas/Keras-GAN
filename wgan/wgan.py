@@ -357,6 +357,7 @@ class WGAN():
         p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
 
         print("In: {}, Out: {}".format(np.mean(y_preds_in), np.mean(y_preds_out)))
+        print("In Len: {}, Out Len: {}".format(len(y_preds_in), len(y_preds_out)))
 
         p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
 
