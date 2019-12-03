@@ -220,8 +220,8 @@ class DCGAN():
                     return 2 * np.random.randint(0, 2, size) - 1
 
                 # Train the critic to make the advreg model produce FAKE labels
-                d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])  # valid data
-                d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid])
+                d_loss_real = self.discriminator.train_on_batch(imgs, valid)  # valid data
+                d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
 
                 self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
 
