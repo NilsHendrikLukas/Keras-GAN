@@ -176,7 +176,7 @@ class DCGAN():
 
         advreg_model.compile(optimizer=optimizer,
                              metrics=["accuracy"],
-                             loss=advreg)
+                             loss=self.wasserstein_loss)
 
         """ Build the critic WITH the adversarial regularization 
         """
