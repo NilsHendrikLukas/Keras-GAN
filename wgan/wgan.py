@@ -217,11 +217,14 @@ class WGAN():
                 If advreg is used, we have to pass x_in and x_out after training the discriminator 
                 """
                 if self.use_advreg:
+                    # Randomly sample target vector
+                    def sample_target(size):
+                        return 2*np.random.randint(0, 2, size)-1
                     # Train the critic to make the advreg model produce FAKE labels
-                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
-                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake])
+                    d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, sample_target(batch_size)])     # valid data
+                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, sample_target(batch_size)])
 
-                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, fake])
+                    self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, sample_target(batch_size)])
 
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
                 else:
@@ -353,7 +356,7 @@ class WGAN():
         """
         Takes the classifiers featuremaps and predicts on them
         """
-        test_size = 128
+        test_size = 256
         epochs = 5
         batch_size = min(128, len(self.x_train))
 
@@ -406,7 +409,9 @@ class WGAN():
         print("True Positives: {}/{}".format(len(true_positives), len(p)))
         print("False Positives: {}".format(len(false_positives)))
 
-        return precision
+        accuracy = (len(true_positives)+len(true_negatives)) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
+
+        return accuracy
 
     def execute_dist_mia(self):
         n = 50
@@ -420,7 +425,7 @@ class WGAN():
 
     def logan_mia(self,
                   critic_model,
-                  threshold=0.3):
+                  threshold=0.2):
         """
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than the passed value
@@ -443,6 +448,7 @@ class WGAN():
         false_positives, = np.where(p >= len(y_preds_in))
         true_positives, = np.where(p < len(y_preds_in))
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
+
 
         return precision
 
