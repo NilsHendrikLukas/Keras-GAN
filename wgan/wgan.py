@@ -265,13 +265,14 @@ class WGAN():
                 # ---------------------
                 #  Plot Statistics
                 # ---------------------
+                plt.figure()
+                plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
                 for attack in self.mia_attacks:
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions, color="blue")
-                        plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
-                    if attack =="featuremap":
+                        if attack =="featuremap":
                         plt.plot(np.arange(len(featuremap_precisions)), featuremap_precisions, color="red")
-                        plt.hlines(0.5, 0, len(featuremap_precisions), linestyles="dashed")
+
                     plt.ylim((0, 1))
                     plt.xlabel("Iterations")
                     plt.ylabel("Success")
