@@ -233,15 +233,6 @@ class WGAN():
             # Plot the progress
             print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
 
-            # ---------------------
-            #  Train Generator
-            # ---------------------
-
-            g_loss = self.combined.train_on_batch(noise, valid)
-
-            # Plot the progress
-            print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
-
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
