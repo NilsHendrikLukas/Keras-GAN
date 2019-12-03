@@ -183,6 +183,8 @@ class WGAN():
         return featuremap_model, critic_model_without_advreg, critic_model_with_advreg, advreg_model
 
     def train(self, epochs, batch_size=128, sample_interval=50):
+        # Store all precision values
+        logan_precisions = []
 
         # Adversarial ground truths
         valid = -np.ones((batch_size, 1))
@@ -238,23 +240,41 @@ class WGAN():
 
             g_loss = self.combined.train_on_batch(noise, valid)
 
-            log = ""
+            # ---------------------
+            #  Debug Output
+            # ---------------------
 
+            log = ""
             # Compute the "real" epoch (passes through the dataset)
             log = log + "[{}/{}]".format((epoch*batch_size)//len(self.x_train), (epochs*batch_size)//len(self.x_train))
             if "logan" in self.mia_attacks:
                 precision = self.logan_mia(self.critic_model)
+                logan_precisions.append(precision)
                 log = log + "[LOGAN Prec: {:.3f}]".format(precision)
 
             if self.use_advreg:
                 log = log + "[A loss: %f]" % (1 - d_loss_advreg[0])
 
             log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
-
             print(log)
+
+
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
+                # ---------------------
+                #  Plot Statistics
+                # ---------------------
+                for attack in self.mia_attacks:
+                    if attack == "logan":
+                        plt.plot(np.arange(len(logan_precisions)), logan_precisions)
+
+                    plt.xlabel("Iterations")
+                    plt.ylabel("Success")
+                    plt.show()
+                # ---------------------
+                #  Save images
+                # ---------------------
                 self.sample_images(epoch)
 
                 # Perform the MIA
@@ -344,7 +364,7 @@ class WGAN():
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than X
         """
-        batch_size = 1024
+        batch_size = min(1024, len(self.x_train))
         idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
         x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
