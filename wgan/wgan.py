@@ -240,7 +240,8 @@ class WGAN():
 
             log = ""
 
-            log = log + "[{}/{}]".format(epoch, epochs)
+            # Compute the "real" epoch (passes through the dataset)
+            log = log + "[{}/{}]".format((epoch*batch_size)//len(self.x_train), (epochs*batch_size)//len(self.x_train))
             if "logan" in self.mia_attacks:
                 precision = self.logan_mia(self.critic_model)
                 log = log + "[LOGAN Prec: {:.3f}]".format(precision)
