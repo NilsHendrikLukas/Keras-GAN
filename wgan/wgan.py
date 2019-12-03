@@ -270,7 +270,7 @@ class WGAN():
                 for attack in self.mia_attacks:
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions, color="blue")
-                        if attack =="featuremap":
+                    if attack =="featuremap":
                         plt.plot(np.arange(len(featuremap_precisions)), featuremap_precisions, color="red")
 
                     plt.ylim((0, 1))
