@@ -181,11 +181,16 @@ class DCGAN():
 
         advreg_model.trainable = False
 
+        def critic_out(y_true, y_pred):
+            return K.binary_crossentropy(y_true, y_pred)
+        def mia_pred(y_true, y_pred):
+            return K.binary_crossentropy(y_true, y_pred)
+
         critic_model_with_advreg.compile(optimizer=optimizer,
                                          metrics=["accuracy"],
                                          loss={
-                                             "critic_out": self.wasserstein_loss,
-                                             "mia_pred": self.wasserstein_loss
+                                             "critic_out": critic_out,
+                                             "mia_pred": mia_pred
                                          })
 
         return featuremap_model, critic_model_without_advreg, critic_model_with_advreg, advreg_model
