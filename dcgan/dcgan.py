@@ -171,9 +171,12 @@ class DCGAN():
         # Do not train the critic when updating the adversarial regularizer
         featuremap_model.trainable = False
 
+        def advreg(y_true, y_pred):
+            return K.binary_crossentropy(y_true, y_pred)
+
         advreg_model.compile(optimizer=optimizer,
                              metrics=["accuracy"],
-                             loss=self.wasserstein_loss)
+                             loss=advreg)
 
         """ Build the critic WITH the adversarial regularization 
         """
@@ -190,8 +193,8 @@ class DCGAN():
         critic_model_with_advreg.compile(optimizer=optimizer,
                                          metrics=["accuracy"],
                                          loss={
-                                             "critic_out": self.wasserstein_loss,
-                                             "mia_pred": self.wasserstein_loss
+                                             "critic_out": critic_out,
+                                             "mia_pred": mia_pred
                                          })
 
         return featuremap_model, critic_model_without_advreg, critic_model_with_advreg, advreg_model
