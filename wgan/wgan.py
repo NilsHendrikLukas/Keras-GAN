@@ -41,7 +41,7 @@ class WGAN():
         (self.x_train, _), (_, _) = mnist.load_data()
         self.x_train = np.reshape((self.x_train.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
 
-        self.x_out = self.x_train[:n_out]  # 10K samples are out!
+        self.x_out = self.x_train[:n_out]  # 10K samples are out! (Technically we have to define a testset aswell..)
         self.x_train = self.x_train[n_out:]
 
         #########################################
@@ -213,6 +213,8 @@ class WGAN():
 
                     adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
                     d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
+
+                    print("[D_loss advreg] {}".format(d_loss_advreg[0]))
                 else:
                     d_loss_real = self.critic_model.train_on_batch(imgs, valid)
                     d_loss_fake = self.critic_model.train_on_batch(gen_imgs, fake)
@@ -232,6 +234,8 @@ class WGAN():
 
             # Plot the progress
             print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
+            if "logan" in self.mia_attacks:
+                self.logan_mia(self.critic_model)
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
@@ -315,22 +319,22 @@ class WGAN():
             file_.write("{}".format(max_acc))
             file_.write("\n")
 
-    def execute_logan_mia(self, critic_model):
-        n = 1000
-        n_val = 500  # Samples used ONLY in validation
-        val_in, val_out = self.x_train[:n_val], \
-                          self.x_out[:n_val]
+    def logan_mia(self, critic_model):
+        """
+        LOGAN is an attack that passes all examples through the critic and classifies those as members with
+        a threshold higher than X
+        """
+        batch_size = 128
+        idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_train), batch_size)
+        x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
-        train_in = self.x_train[n_val:n_val + n_val]
-        train_out = self.x_out[n_val:n_val + len(train_in)]
-        train_in, train_out = shuffle(train_in, train_out)
+        y_preds_in = critic_model.predict(x_in)
+        y_preds_out = critic_model.predict(x_out)
 
-        # max_acc = logan_mia(self.get_logit_discriminator(critic_model), train_in, train_out)
-        max_acc = logan_top_n(self.get_featuremap_output(critic_model), train_in, train_out, n_val // 10)
-
-        with open('Keras-GAN/dcgan/logs/logan_mia.csv', mode='w+') as file_:
-            file_.write("{}".format(max_acc))
-            file_.write("\n")
+        # Get 10% with highest confidence
+        p = np.concatenate((y_preds_in, y_preds_out)).argsort()[:(len(y_preds_out)+len(y_preds_in))//10]
+        idx_in, = np.where(p < len(y_preds_in))
+        print("LOGAN ACC: {}".format(len(idx_in)/len(p)))
 
     def load_model(self):
 
