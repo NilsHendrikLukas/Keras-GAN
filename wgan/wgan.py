@@ -51,7 +51,7 @@ class WGAN():
         optimizer = RMSprop(lr=0.00005)
 
         # Gets all (compiled!) critic models
-        self.featuremap_model, self.critic_model, self.critic_model_with_advreg, self.advreg_model = self.build_critic()
+        self.featuremap_model, self.critic_model, self.critic_model_with_advreg, self.advreg_model = self.build_critic(optimizer)
 
         # Build the generator
         self.generator = self.build_generator()
@@ -107,7 +107,7 @@ class WGAN():
     def build_generator(self):
         return build_generator()
 
-    def build_critic(self):
+    def build_critic(self, optimizer):
         """ Build the discriminators for MNIST with advreg
         """
         img_shape = (28, 28, 1)
@@ -137,7 +137,7 @@ class WGAN():
                 """
         critic_model_without_advreg = Model(inputs=[critic_in], outputs=[critic_out])
 
-        critic_model_without_advreg.compile(optimizer=Adam(1e-3),
+        critic_model_without_advreg.compile(optimizer=optimizer,
                                             metrics=["accuracy"],
                                             loss=self.wasserstein_loss)
 
@@ -157,7 +157,7 @@ class WGAN():
         # Do not train the critic when updating the adversarial regularizer
         featuremap_model.trainable = False
 
-        advreg_model.compile(optimizer=Adam(1e-3),
+        advreg_model.compile(optimizer=optimizer,
                        metrics=["accuracy"],
                        loss=self.wasserstein_loss)
 
@@ -167,7 +167,7 @@ class WGAN():
 
         advreg_model.trainable = False
 
-        critic_model_with_advreg.compile(optimizer=Adam(1e-3),
+        critic_model_with_advreg.compile(optimizer=optimizer,
                        metrics=["accuracy"],
                        loss={
                            "critic_out": self.wasserstein_loss,
