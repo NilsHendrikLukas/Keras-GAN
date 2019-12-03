@@ -190,8 +190,8 @@ class DCGAN():
         critic_model_with_advreg.compile(optimizer=optimizer,
                                          metrics=["accuracy"],
                                          loss={
-                                             "critic_out": critic_out,
-                                             "mia_pred": mia_pred
+                                             "critic_out": self.wasserstein_loss,
+                                             "mia_pred": self.wasserstein_loss
                                          })
 
         return featuremap_model, critic_model_without_advreg, critic_model_with_advreg, advreg_model
@@ -221,8 +221,6 @@ class DCGAN():
             gen_imgs = self.generator.predict(noise)
 
             if self.use_advreg:
-                # Randomly sample target vector
-
                 # Train the critic to make the advreg model produce FAKE labels
                 d_loss_real = self.discriminator.train_on_batch(imgs, valid)  # valid data
                 d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
@@ -244,7 +242,6 @@ class DCGAN():
             if self.use_advreg:
                 def sample_target(size):
                     return np.random.randint(0, 2, size)
-
 
                 idx_out = np.random.randint(0, len(self.x_out), batch_size)
                 imgs_out = self.x_out[idx_out]
