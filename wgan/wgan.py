@@ -239,6 +239,8 @@ class WGAN():
             g_loss = self.combined.train_on_batch(noise, valid)
 
             log = ""
+
+            log = log + "[{}/{}]".format(epoch, epochs)
             if "logan" in self.mia_attacks:
                 precision = self.logan_mia(self.critic_model)
                 log = log + "[LOGAN Prec: {:.3f}]".format(precision)
