@@ -248,7 +248,7 @@ class DCGAN():
                 idx_in = np.random.randint(0, len(self.x_train), batch_size)
                 imgs = self.x_train[idx_in]
 
-                adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
+                adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, valid)))
                 d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
 
             # ---------------------
