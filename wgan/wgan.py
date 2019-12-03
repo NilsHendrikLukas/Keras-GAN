@@ -268,8 +268,7 @@ class WGAN():
                 for attack in self.mia_attacks:
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions)
-                        plt.hlines(np.arange(len(logan_precisions)), [0.5]*len(logan_precisions),
-                                   linestyles="dashed")
+                        plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
 
 
                     plt.ylim((0, 1))
