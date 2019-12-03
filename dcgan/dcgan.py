@@ -220,11 +220,10 @@ class DCGAN():
                     return 2 * np.random.randint(0, 2, size) - 1
 
                 # Train the critic to make the advreg model produce FAKE labels
-                d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, sample_target(
-                    batch_size)])  # valid data
-                d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, sample_target(batch_size)])
+                d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])  # valid data
+                d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid])
 
-                self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, sample_target(batch_size)])
+                self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
 
                 d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
             else:
@@ -409,5 +408,5 @@ class DCGAN():
 
 
 if __name__ == '__main__':
-    dcgan = DCGAN(mia_attacks=["logan", "featuremap"])
+    dcgan = DCGAN(use_advreg=True, mia_attacks=["logan", "featuremap"])
     dcgan.train(epochs=4000, batch_size=32, save_interval=50)
