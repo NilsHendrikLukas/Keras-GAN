@@ -406,7 +406,7 @@ class WGAN():
         print("True Positives: {}/{}".format(len(true_positives), len(p)))
         print("False Positives: {}".format(len(false_positives)))
 
-        accuracy = len(true_positives+true_negatives) / (len(true_positives+true_negatives+false_positives+false_negatives))
+        accuracy = len(true_positives)+len(true_negatives) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
 
         return accuracy
 
