@@ -219,7 +219,7 @@ class WGAN():
                 if self.use_advreg:
                     # Randomly sample target vector
                     def sample_target(size):
-                        return 2*np.random.randint(0, 1, size)-1
+                        return 2*np.random.randint(0, 2, size)-1
                     # Train the critic to make the advreg model produce FAKE labels
                     d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, sample_target(batch_size)])     # valid data
                     d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, sample_target(batch_size)])
