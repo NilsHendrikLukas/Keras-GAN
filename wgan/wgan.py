@@ -116,24 +116,26 @@ class WGAN():
         """
         img_shape = (28, 28, 1)
 
+        dropout = 0 # 0.25
+
         critic_in = Input(img_shape)
 
         l0 = Conv2D(16, kernel_size=3, strides=2, input_shape=img_shape, padding="same")(critic_in)
         l1 = LeakyReLU(alpha=0.2)(l0)
-        l2 = Dropout(0.25)(l1)
+        l2 = Dropout(dropout)(l1)
         l3 = Conv2D(32, kernel_size=3, strides=2, padding="same")(l2)
         l4 = ZeroPadding2D(padding=((0, 1), (0, 1)))(l3)
         l5 = BatchNormalization(momentum=0.8)(l4)
         l6 = LeakyReLU(alpha=0.2)(l5)
-        l7 = Dropout(0.25)(l6)
+        l7 = Dropout(dropout)(l6)
         l8 = Conv2D(64, kernel_size=3, strides=2, padding="same")(l7)
         l9 = BatchNormalization(momentum=0.8)(l8)
         l10 = LeakyReLU(alpha=0.2)(l9)
-        l11 = Dropout(0.25)(l10)
+        l11 = Dropout(dropout)(l10)
         l12 = Conv2D(128, kernel_size=3, strides=1, padding="same")(l11)
         l13 = BatchNormalization(momentum=0.8)(l12)
         l14 = LeakyReLU(alpha=0.2)(l13)
-        l15 = Dropout(0.25)(l14)
+        l15 = Dropout(dropout)(l14)
         featuremaps = Flatten()(l15)
         critic_out = Dense(1, name="critic_out")(featuremaps)
 
