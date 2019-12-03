@@ -17,9 +17,11 @@ from mia_attacks.mia_attacks import distance_mia, featuremap_mia, logan_top_n
 
 class WGAN():
     def __init__(self,
+                 max_data=40000,
                  mia_attacks=None,
                  use_advreg=True):
         """
+        :param max_data How much x_in data to use
         :param mia_attacks List with following possible values ["logan", "dist", "featuremap"]
         :param use_advreg Build with advreg or without
 
@@ -42,7 +44,9 @@ class WGAN():
         self.x_train = np.reshape((self.x_train.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
 
         self.x_out = self.x_train[:n_out]  # 10K samples are out! (Technically we have to define a testset aswell..)
-        self.x_train = self.x_train[n_out:]
+        self.x_train = self.x_train[n_out:n_out+max_data]
+
+        print("Loading with {} data samples!".format(len(self.x_train)))
 
         #########################################
         # Build and compile the critic and generator
@@ -373,7 +377,7 @@ class WGAN():
 
 
 if __name__ == '__main__':
-    wgan = WGAN(mia_attacks=["logan"])
+    wgan = WGAN(use_advreg=False, mia_attacks=["logan"])
 
     # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
     wgan.train(epochs=40000, batch_size=32, sample_interval=5)
