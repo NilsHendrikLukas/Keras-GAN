@@ -24,7 +24,7 @@ class DPGAN():
     def __init__(self,
                  max_data=40000,
                  noise_std=0.001,
-                 mia_attacks=None,
+                 mia_attacks=None
                  ):
         self.img_rows = 28
         self.img_cols = 28

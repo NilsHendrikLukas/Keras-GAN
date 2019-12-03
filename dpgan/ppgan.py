@@ -3,7 +3,7 @@ os.environ["KERAS_BACKEND"] = "tensorflow"
 
 import numpy as np
 from tqdm import tqdm
-import matplotlib.pyplot as plt1
+import matplotlib.pyplot as plt
 
 from keras.layers import Input
 from keras.models import Model, Sequential
@@ -17,135 +17,256 @@ from keras import backend as K
 from keras import initializers
 
 from gradient_noise import add_gradient_noise
-NoisyAdam = add_gradient_noise(Adam)
 
-K.set_image_dim_ordering('th')
+class PPGAN():
+    def __init__(self,
+                 max_data=40000,
+                 noise_std=0.0001,
+                 mia_attacks=None
+                 ):
+        self.mia_attacks = mia_attacks
 
-np.random.seed(0) # Deterministic output.
-random_dim = 100 # For consistency with other GAN implementations.
+        NoisyAdam = add_gradient_noise(Adam)
 
-# Load data
-(X_train, y_train), (X_test, y_test) = mnist.load_data()
-X_train = (X_train.astype(np.float32) - 127.5) / 127.5
-X_train = X_train.reshape(60000, 784)
+        K.set_image_dim_ordering('th')
 
-# Generator
-generator = Sequential()
-generator.add(Dense(256, input_dim=random_dim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
-generator.add(LeakyReLU(0.2))
-generator.add(Dense(512))
-generator.add(LeakyReLU(0.2))
-generator.add(Dense(1024))
-generator.add(LeakyReLU(0.2))
-generator.add(Dense(X_train.shape[1], activation='tanh'))
+        np.random.seed(0) # Deterministic output.
+        self.random_dim = 100 # For consistency with other GAN implementations.
 
-generator_optimizer = Adam(lr=0.0002, beta_1=0.5)
-generator.compile(optimizer=generator_optimizer, loss='binary_crossentropy')
+        # Load data
+        (X_train, y_train), (X_test, y_test) = mnist.load_data()
+        X_train = (X_train.astype(np.float32) - 127.5) / 127.5
+        self.X_train = X_train.reshape(60000, 784)
 
-# Discriminator
-discriminator = Sequential()
-discriminator.add(Dense(1024, input_dim=X_train.shape[1], kernel_initializer=initializers.RandomNormal(stddev=0.02)))
-discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.3))
-discriminator.add(Dense(512))
-discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.3))
-discriminator.add(Dense(256))
-discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.3))
-discriminator.add(Dense(1, activation='sigmoid'))
+        # Generator
+        generator = Sequential()
+        generator.add(Dense(256, input_dim=self.random_dim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(512))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(1024))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(self.X_train.shape[1], activation='tanh'))
 
-clipnorm = 5.0
-standard_deviation = 0.0001
-discriminator_optimizer = NoisyAdam(lr=0.0002, beta_1=0.5, clipnorm=clipnorm, standard_deviation=standard_deviation)
-discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentropy')
+        generator_optimizer = Adam(lr=0.0002, beta_1=0.5)
+        generator.compile(optimizer=generator_optimizer, loss='binary_crossentropy')
+        self.generator = generator
 
-# GAN
-discriminator.trainable = False
-gan_input = Input(shape=(random_dim,))
-x = generator(gan_input)
-gan_output = discriminator(x)
-gan = Model(inputs=gan_input, outputs=gan_output)
+        # Discriminator
+        discriminator = Sequential()
+        discriminator.add(Dense(1024, input_dim=self.X_train.shape[1], kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+        discriminator.add(LeakyReLU(0.2))
+        discriminator.add(Dropout(0.3))
+        discriminator.add(Dense(512))
+        discriminator.add(LeakyReLU(0.2))
+        discriminator.add(Dropout(0.3))
+        discriminator.add(Dense(256))
+        discriminator.add(LeakyReLU(0.2))
+        discriminator.add(Dropout(0.3))
+        discriminator.add(Dense(1, activation='sigmoid'))
 
-gan_optimizer = Adam(lr=0.0002, beta_1=0.5)
-gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
+        clipnorm = 5.0
+        discriminator_optimizer = NoisyAdam(lr=0.0002, beta_1=0.5, clipnorm=clipnorm, standard_deviation=noise_std)
+        discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentropy')
+        self.discriminator = discriminator
 
-# Losses for plotting
-discriminator_losses = []
-generator_losses = []
+        # GAN
+        self.discriminator.trainable = False
+        gan_input = Input(shape=(self.random_dim,))
+        x = generator(gan_input)
+        gan_output = discriminator(x)
+        gan = Model(inputs=gan_input, outputs=gan_output)
 
-def plot_loss(epoch):
-    plt.figure(figsize=(10, 8))
-    plt.plot(discriminator_losses, label='Discriminitive Loss')
-    plt.plot(generator_losses, label='Generative Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.savefig('images/gan_loss_epoch_{}.png'.format(epoch))
+        gan_optimizer = Adam(lr=0.0002, beta_1=0.5)
+        gan.compile(optimizer=gan_optimizer, loss='binary_crossentropy')
+        self.gan = gan
 
-def plot_generated_images(epoch, examples=100, dim=(10, 10), figsize=(10, 10)):
-    noise = np.random.normal(0, 1, size=[examples, random_dim])
-    generated_images = generator.predict(noise)
-    generated_images = generated_images.reshape(examples, 28, 28)
+        # Losses for plotting
+        self.discriminator_losses = []
+        self.generator_losses = []
 
-    plt.figure(figsize=figsize)
-    for i in range(generated_images.shape[0]):
-        plt.subplot(dim[0], dim[1], i+1)
-        plt.imshow(generated_images[i], interpolation='nearest', cmap='gray_r')
-        plt.axis('off')
+    def plot_loss(self, epoch):
+        plt.figure(figsize=(10, 8))
+        plt.plot(self.discriminator_losses, label='Discriminitive Loss')
+        plt.plot(self.generator_losses, label='Generative Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.savefig('images/gan_loss_epoch_{}.png'.format(epoch))
 
-    plt.tight_layout()
-    plt.savefig('images/gan_generated_image_epoch_{}.png'.format(epoch))
+    def plot_generated_images(self, epoch, examples=100, dim=(10, 10), figsize=(10, 10)):
+        noise = np.random.normal(0, 1, size=[examples, self.random_dim])
+        generated_images = self.generator.predict(noise)
+        generated_images = generated_images.reshape(examples, 28, 28)
 
-def save_models(epoch):
-    generator.save('models/gan_generator_epoch_{}.h5'.format(epoch))
-    discriminator.save('models/gan_discriminator_epoch_{}.h5'.format(epoch))
+        plt.figure(figsize=figsize)
+        for i in range(generated_images.shape[0]):
+            plt.subplot(dim[0], dim[1], i+1)
+            plt.imshow(generated_images[i], interpolation='nearest', cmap='gray_r')
+            plt.axis('off')
 
-def train(epochs=1, batch_size=64):
-    batch_count = int(X_train.shape[0] / batch_size)
+        plt.tight_layout()
+        plt.savefig('images/gan_generated_image_epoch_{}.png'.format(epoch))
 
-    for e in range(1, epochs+1):
-        print('-' * 15, 'Epoch {}'.format(e), '-' * 15)
-        for _ in tqdm(range(batch_count)):
-            # Get a random set of input noise and images
-            noise = np.random.normal(0, 1, size=[batch_size, random_dim])
-            image_batch = X_train[np.random.randint(0, X_train.shape[0], size=batch_size)]
+    def save_models(self, epoch):
+        self.generator.save('models/gan_generator_epoch_{}.h5'.format(epoch))
+        self.discriminator.save('models/gan_discriminator_epoch_{}.h5'.format(epoch))
 
-            # Generate fake MNIST images
-            generated_images = generator.predict(noise)
-            # print np.shape(image_batch), np.shape(generated_images)
-            X = np.concatenate([image_batch, generated_images])
+    def train(self, epochs=1, batch_size=64):
+        batch_count = int(self.X_train.shape[0] / batch_size)
 
-            # Labels for generated and real data
-            y_dis = np.zeros(2 * batch_size)
-            # One-sided label smoothing
-            y_dis[:batch_size] = 0.9
+        for e in range(1, epochs+1):
+            print('-' * 15, 'Epoch {}'.format(e), '-' * 15)
+            for _ in tqdm(range(batch_count)):
+                # Get a random set of input noise and images
+                noise = np.random.normal(0, 1, size=[batch_size, self.random_dim])
+                image_batch = self.X_train[np.random.randint(0, self.X_train.shape[0], size=batch_size)]
 
-            # Train discriminator
-            discriminator.trainable = True
-            discriminator_loss = discriminator.train_on_batch(X, y_dis)
+                # Generate fake MNIST images
+                generated_images = self.generator.predict(noise)
+                # print np.shape(image_batch), np.shape(generated_images)
+                X = np.concatenate([image_batch, generated_images])
 
-            # Train generator
-            noise = np.random.normal(0, 1, size=[batch_size, random_dim])
-            y_gen = np.ones(batch_size)
-            discriminator.trainable = False
-            generator_loss = gan.train_on_batch(noise, y_gen)
+                # Labels for generated and real data
+                y_dis = np.zeros(2 * batch_size)
+                # One-sided label smoothing
+                y_dis[:batch_size] = 0.9
 
-        # Store loss of most recent batch from this epoch
-        discriminator_losses.append(discriminator_loss)
-        generator_losses.append(generator_loss)
+                # Train discriminator
+                self.discriminator.trainable = True
+                discriminator_loss = self.discriminator.train_on_batch(X, y_dis)
 
-        plot_generated_images(e)
-        if e == 1 or e % 20 == 0:
-            save_models(e)
+                # Train generator
+                noise = np.random.normal(0, 1, size=[batch_size, self.random_dim])
+                y_gen = np.ones(batch_size)
+                self.discriminator.trainable = False
+                generator_loss = self.gan.train_on_batch(noise, y_gen)
 
-    # Plot losses from every epoch
-    plot_loss(e)
+                # ---------------------
+                #  Debug Output
+                # ---------------------
+
+                log = ""
+                # Compute the "real" epoch (passes through the dataset)
+                log = log + "[{}/{}]".format((epochs*batch_size)//len(self.X_train), (epochs*batch_size)//len(self.X_train))
+                if "logan" in self.mia_attacks:
+                    precision = self.logan_mia(self.discriminator)
+                    logan_precisions.append(precision)
+                    log = log + "[LOGAN Prec: {:.3f}]".format(precision)
+                if "featuremap" in self.mia_attacks:
+                    precision = self.featuremap_mia()
+                    featuremap_precisions.append(precision)
+                    log = log + "[FM Prec: {:.3f}]".format(precision)
+
+                log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
+                print(log)
+
+            # Store loss of most recent batch from this epoch
+            self.discriminator_losses.append(discriminator_loss)
+            self.generator_losses.append(generator_loss)
+
+            self.plot_generated_images(e)
+            if e == 1 or e % 20 == 0:
+                self.save_models(e)
+
+        # Plot losses from every epoch
+        plot_loss(e)
+
+    def featuremap_mia(self, threshold=0.2):
+        """
+        Takes the classifiers featuremaps and predicts on them
+        """
+        test_size = 256
+        epochs = 5
+        batch_size = min(128, len(self.x_train))
+
+        for e in range(epochs):
+            idx_in  = np.random.randint(0, len(self.x_train), batch_size)
+            idx_out = np.random.randint(0, len(self.x_out), batch_size)
+
+            x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
+
+            valid = -np.ones((batch_size, 1))
+            fake = np.ones((batch_size, 1))
+            d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
+            d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
+
+        idx_in = np.random.randint(0, len(self.x_train), test_size)
+        idx_out = np.random.randint(0, len(self.x_out), test_size)
+
+        y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
+        y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
+
+        # -1 means in, 1 means out
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
+
+        """
+            True negatives
+        """
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+
+        # How many of the ones that are in are covered:
+        true_negatives, = np.where(p >= len(y_preds_in))
+        false_negatives, = np.where(p < len(y_preds_in))
+
+        print("True Negatives: {}/{}".format(len(true_negatives), len(p)))
+        print("False Negatives: {}".format(len(false_negatives)))
+
+        precision = len(true_negatives) / (len(true_negatives) + len(false_negatives))
+
+        """
+            True Positives
+        """
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = p[:int((len(y_preds_out) + len(y_preds_in)) * threshold)]
+
+        # How many of the ones that are in are covered:
+        true_positives, = np.where(p < len(y_preds_in))
+        false_positives, = np.where(p >= len(y_preds_in))
+
+        print("True Positives: {}/{}".format(len(true_positives), len(p)))
+        print("False Positives: {}".format(len(false_positives)))
+
+        accuracy = (len(true_positives)+len(true_negatives)) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
+
+        return accuracy
+
+    def logan_mia(self,
+                  critic_model,
+                  threshold=0.2):
+        """
+        LOGAN is an attack that passes all examples through the critic and classifies those as members with
+        a threshold higher than the passed value
+        """
+        batch_size = min(1024, len(self.X_train))
+        idx_in, idx_out = np.random.randint(0, len(self.X_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
+        x_in, x_out = self.X_train[idx_in], self.x_out[idx_out]
+
+        y_preds_in = critic_model.predict(x_in)
+        y_preds_out = critic_model.predict(x_out)
+
+        # Get 10% with highest confidence
+        p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
+
+        print("In: {}, Out: {}".format(np.mean(y_preds_in), np.mean(y_preds_out)))
+
+        p = p[-int((len(y_preds_out)+len(y_preds_in))*threshold):]
+
+        # How many of the ones that are in are covered:
+        false_positives, = np.where(p >= len(y_preds_in))
+        true_positives, = np.where(p < len(y_preds_in))
+        precision = len(true_positives) / (len(true_positives) + len(false_positives))
+
+
+        return precision
+
 
 if __name__ == '__main__':
     for path in ['images', 'models']:
         if not os.path.exists(path):
             os.makedirs(path)
-
-    train(100, 128)
+    ppgan = PPGAN(noise_std=0.0001, mia_attacks=["logan"])
+    ppgan.train(100, 128)
 
