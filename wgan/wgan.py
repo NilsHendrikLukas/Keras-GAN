@@ -355,7 +355,7 @@ class WGAN():
         """
         test_size = 128
         epochs = 5
-        batch_size = min(64, len(self.x_train))
+        batch_size = min(128, len(self.x_train))
 
         for e in range(epochs):
             idx_in  = np.random.randint(0, len(self.x_train), batch_size)
@@ -375,12 +375,12 @@ class WGAN():
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
         # -1 means in, 1 means out
-        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == 0)[0])))
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
         print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         # Get 10% with highest confidence in being a valid class
         p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
-        p = p[int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+        p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
 
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
