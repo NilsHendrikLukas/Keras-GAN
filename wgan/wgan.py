@@ -36,15 +36,14 @@ class WGAN():
         self.use_advreg = use_advreg
         self.mia_attacks = mia_attacks
 
-        n_out = 10000  # 10K samples are out!
-
         np.random.seed(0)
         #######################################
         # Load, normalize and split the dataset
         (self.x_train, _), (_, _) = mnist.load_data()
         self.x_train = np.reshape((self.x_train.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
 
-        self.x_out = np.reshape(extract_training_samples('digits'), (-1, *self.img_shape))
+        self.x_out, y_out = extract_training_samples('digits')
+        self.x_out = np.reshape(self.x_out, (-1, *self.img_shape))
         self.x_train = self.x_train[:max_data]
 
         print("Loading with {} data samples!".format(len(self.x_train)))
