@@ -232,13 +232,17 @@ class WGAN():
 
             g_loss = self.combined.train_on_batch(noise, valid)
 
-            # Plot the progress
-            if self.use_advreg:
-                print("%d [D loss: %f] [G loss: %f] [A loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0], 1-d_loss_advreg[0]))
-            else:
-                print("%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
+            log = ""
             if "logan" in self.mia_attacks:
-                self.logan_mia(self.critic_model)
+                precision = self.logan_mia(self.critic_model)
+                log = log + "[LOGAN Prec: {:.3f}]".format(precision)
+
+            if self.use_advreg:
+                log = log + "[A loss: %f]" % (1 - d_loss_advreg[0])
+
+            log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
+
+            print(log, end="\r")
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
@@ -327,7 +331,7 @@ class WGAN():
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than X
         """
-        batch_size = 512
+        batch_size = 1024
         idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
         x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
@@ -341,7 +345,7 @@ class WGAN():
         false_positives, = np.where(p >= len(y_preds_in))
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
-        print("LOGAN Precision: {}".format(precision))
+        return precision
 
     def load_model(self):
 
