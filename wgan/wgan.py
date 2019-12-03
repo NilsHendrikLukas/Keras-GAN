@@ -349,7 +349,7 @@ class WGAN():
         self.gan_discriminator.layers[-1].set_weights(self.critic_model.layers[-1].get_weights())
         return self.gan_discriminator
 
-    def featuremap_mia(self, threshold=0.3):
+    def featuremap_mia(self, threshold=0.2):
         """
         Takes the classifiers featuremaps and predicts on them
         """
@@ -378,9 +378,26 @@ class WGAN():
         print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
         print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
-        # Get 10% with highest confidence in being a valid class
+        """
+            True negatives
+        """
         p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
         p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+
+        # How many of the ones that are in are covered:
+        true_negatives, = np.where(p >= len(y_preds_in))
+        false_negatives, = np.where(p < len(y_preds_in))
+
+        print("True Negatives: {}/{}".format(len(true_negatives), len(p)))
+        print("False Negatives: {}".format(len(false_negatives)))
+
+        precision = len(true_negatives) / (len(true_negatives) + len(false_negatives))
+
+        """
+            True Positives
+        """
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = p[:int((len(y_preds_out) + len(y_preds_in)) * threshold)]
 
         # How many of the ones that are in are covered:
         true_positives, = np.where(p < len(y_preds_in))
@@ -388,8 +405,6 @@ class WGAN():
 
         print("True Positives: {}/{}".format(len(true_positives), len(p)))
         print("False Positives: {}".format(len(false_positives)))
-
-        precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
         return precision
 
