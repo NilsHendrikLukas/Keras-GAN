@@ -203,6 +203,9 @@ class WGAN():
                 idx = np.random.randint(0, len(self.x_train), batch_size)
                 imgs = self.x_train[idx]
 
+                idx_out = np.random.randint(0, len(self.x_out), batch_size)
+                imgs_out = self.x_out[idx_out]
+
                 # Sample noise as generator input
                 noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
 
@@ -216,11 +219,7 @@ class WGAN():
                 if self.use_advreg:
                     # Train the critic to make the advreg model produce FAKE labels
                     d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
-                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid])
-
-                    # Train against adversary
-                    idx_out = np.random.randint(0, len(self.x_out), batch_size)
-                    imgs_out = self.x_out[idx_out]
+                    d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, fake])
                     d_loss_real_out = self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, fake])
 
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
@@ -355,11 +354,11 @@ class WGAN():
         """
         test_size = 1024
         epochs = 5
-        batch_size = min(2048, len(self.x_train)-test_size)
+        batch_size = min(2048, len(self.x_train))
 
         for e in range(epochs):
-            idx_in  = np.random.randint(test_size, len(self.x_train), batch_size)
-            idx_out = np.random.randint(test_size, len(self.x_out), batch_size)
+            idx_in  = np.random.randint(0, len(self.x_train), batch_size)
+            idx_out = np.random.randint(0, len(self.x_out), batch_size)
 
             x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
@@ -368,8 +367,11 @@ class WGAN():
             d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
             d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
-        y_preds_in = self.advreg_model.predict(self.x_train[:test_size])
-        y_preds_out = self.advreg_model.predict(self.x_out[:test_size])
+        idx_in = np.random.randint(0, len(self.x_train), test_size)
+        idx_out = np.random.randint(0, len(self.x_out), test_size)
+
+        y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
+        y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
         # Get 10% with highest confidence
         p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
