@@ -6,6 +6,7 @@ import keras.backend as K
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.datasets import mnist
+from emnist import extract_training_samples
 from keras.layers import Input, Dense, Dropout, Lambda, Conv2D, LeakyReLU, ZeroPadding2D, BatchNormalization, Flatten
 from keras.models import Sequential, Model
 from keras.optimizers import RMSprop, Adam
@@ -43,8 +44,8 @@ class WGAN():
         (self.x_train, _), (_, _) = mnist.load_data()
         self.x_train = np.reshape((self.x_train.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
 
-        self.x_out = self.x_train[:n_out]  # 10K samples are out! (Technically we have to define a testset aswell..)
-        self.x_train = self.x_train[n_out:n_out+max_data]
+        self.x_out = np.reshape(extract_training_samples('digits'), (-1, *self.img_shape))
+        self.x_train = self.x_train[:max_data]
 
         print("Loading with {} data samples!".format(len(self.x_train)))
 
@@ -213,6 +214,12 @@ class WGAN():
                     # Train the critic to make the advreg model produce FAKE labels
                     d_loss_real = self.critic_model_with_advreg.train_on_batch(imgs, [valid, fake])     # valid data
                     d_loss_fake = self.critic_model_with_advreg.train_on_batch(gen_imgs, [fake, valid])
+
+                    # Train against adversary
+                    idx_out = np.random.randint(0, len(self.x_out), batch_size)
+                    imgs_out = self.x_out[idx_out]
+                    d_loss_real_out = self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, fake])
+
                     d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
                 else:
                     d_loss_real = self.critic_model.train_on_batch(imgs, valid)
