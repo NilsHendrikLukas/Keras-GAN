@@ -217,13 +217,13 @@ class DCGAN():
             if self.use_advreg:
                 # Randomly sample target vector
                 def sample_target(size):
-                    return 2 * np.random.randint(0, 2, size) - 1
+                    return  np.random.randint(0, 2, size)
 
                 # Train the critic to make the advreg model produce FAKE labels
                 d_loss_real = self.discriminator.train_on_batch(imgs, valid)  # valid data
                 d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
 
-                self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
+                self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, sample_target(batch_size)])
 
                 d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
             else:
