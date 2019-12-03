@@ -406,7 +406,10 @@ class WGAN():
         print("True Positives: {}/{}".format(len(true_positives), len(p)))
         print("False Positives: {}".format(len(false_positives)))
 
-        return precision
+
+        accuracy = len(true_positives+true_negatives) / (len(true_positives+true_negatives+false_positives+false_negatives))
+
+        return accuracy
 
     def execute_dist_mia(self):
         n = 50
@@ -443,6 +446,7 @@ class WGAN():
         false_positives, = np.where(p >= len(y_preds_in))
         true_positives, = np.where(p < len(y_preds_in))
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
+
 
         return precision
 
