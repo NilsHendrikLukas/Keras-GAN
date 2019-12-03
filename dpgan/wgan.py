@@ -186,7 +186,7 @@ class WassersteinGAN(object):
         s = tensor.get_shape().as_list()  # get shape of the tensor
         rt = tf.random_normal(s, mean=0.0, stddev=self.sigma)
         t = tf.add(tensor, tf.scalar_mul((1.0 / batch_size), rt))
-        return t
+        return tensor
 
     def norm_w(self, v):
         return sum([linalg.norm(i) for i in v])
