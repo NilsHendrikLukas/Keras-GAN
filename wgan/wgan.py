@@ -243,24 +243,24 @@ class WGAN():
             # Plot the progress
             print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
 
-        # If at save interval => save generated image samples
-        if epoch % sample_interval == 0:
-            self.sample_images(epoch)
+            # If at save interval => save generated image samples
+            if epoch % sample_interval == 0:
+                self.sample_images(epoch)
 
-            # Perform the MIA
-            #### Added
-            def overfit_discriminator(epochs):
-                for i in range(epochs):
-                    idx = np.random.randint(0, self.x_train.shape[0], batch_size)
-                    imgs = self.x_train[idx]
-                    self.critic_model.train_on_batch(imgs, valid)
+                # Perform the MIA
+                #### Added
+                def overfit_discriminator(epochs):
+                    for i in range(epochs):
+                        idx = np.random.randint(0, self.x_train.shape[0], batch_size)
+                        imgs = self.x_train[idx]
+                        self.critic_model.train_on_batch(imgs, valid)
 
-            overfit_discriminator(0)
-            #### Added
+                overfit_discriminator(0)
+                #### Added
 
-            self.execute_logan_mia(self.critic_model)
-            # self.execute_dist_mia()
-            # self.execute_featuremap_mia()
+                self.execute_logan_mia(self.critic_model)
+                # self.execute_dist_mia()
+                # self.execute_featuremap_mia()
 
     def sample_images(self, epoch):
         r, c = 5, 5
