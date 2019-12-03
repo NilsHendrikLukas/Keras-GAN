@@ -341,8 +341,9 @@ class WGAN():
         batch_size = min(1024, len(self.x_train)-test_size)
 
         for e in range(epochs):
-            idx_in, idx_out = np.random.randint(test_size, len(self.x_train), batch_size), np.random.randint(test_size, len(self.x_out),
-                                                                                                     batch_size)
+            idx_in  = np.random.randint(test_size, len(self.x_train), batch_size)
+            idx_out = np.random.randint(test_size, len(self.x_out), batch_size)
+
             x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
             valid = -np.ones((batch_size, 1))
@@ -357,7 +358,6 @@ class WGAN():
         p = np.abs(np.concatenate((y_preds_in, y_preds_out))).flatten().argsort()
 
         print("In: {}, Out: {}".format(np.mean(y_preds_in), np.mean(y_preds_out)))
-        print("In Len: {}, Out Len: {}".format(len(y_preds_in), len(y_preds_out)))
 
         p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
 
