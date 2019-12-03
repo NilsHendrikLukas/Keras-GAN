@@ -214,7 +214,7 @@ class WGAN():
                     adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
                     d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
 
-                    print("[D_loss advreg] {}".format(d_loss_advreg[0]))
+
                 else:
                     d_loss_real = self.critic_model.train_on_batch(imgs, valid)
                     d_loss_fake = self.critic_model.train_on_batch(gen_imgs, fake)
@@ -233,7 +233,10 @@ class WGAN():
             g_loss = self.combined.train_on_batch(noise, valid)
 
             # Plot the progress
-            print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
+            if self.use_advreg:
+                print("%d [D loss: %f] [G loss: %f] [A loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0], 1-d_loss_advreg[0]))
+            else:
+                print("%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
             if "logan" in self.mia_attacks:
                 self.logan_mia(self.critic_model)
 
@@ -325,7 +328,7 @@ class WGAN():
         a threshold higher than X
         """
         batch_size = 128
-        idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_train), batch_size)
+        idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
         x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
         y_preds_in = critic_model.predict(x_in)
@@ -365,7 +368,7 @@ if __name__ == '__main__':
     wgan = WGAN()
 
     # wgan.train(epochs=4000, batch_size=32, sample_interval=5)
-    wgan.train(epochs=40000, batch_size=32, sample_interval=5)
+    wgan.train(epochs=40000, batch_size=32, sample_interval=5, mia_attacks=["logan"])
     # wgan.save_model()
 
     # wgan.load_model()
