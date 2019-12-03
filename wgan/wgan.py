@@ -366,6 +366,7 @@ class WGAN():
         false_positives, = np.where(p >= len(y_preds_in))
 
         print("True Positives: {}/{}".format(len(true_positives), len(p)))
+        print("False Positives: {}".format(len(false_positives)))
 
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
