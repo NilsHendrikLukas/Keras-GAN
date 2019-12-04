@@ -144,9 +144,9 @@ class PPGAN():
         """
         advreg_in = Input(input_shape)
 
-        l0 = Dense(units=256)(advreg_in)
+        l0 = Dense(units=512)(advreg_in)
         l1 = Dropout(0.2)(l0)
-        l2 = Dense(units=128)(l1)
+        l2 = Dense(units=256)(l1)
         l3 = Dropout(0.2)(l2)
         l4 = Dense(units=10)(l3)
 
@@ -263,7 +263,7 @@ class PPGAN():
         Takes the classifiers featuremaps and predicts on them
         """
         test_size = 256
-        epochs = 5
+        epochs = 10
         batch_size = min(128, len(self.X_train))
 
         for e in range(epochs):
@@ -283,9 +283,9 @@ class PPGAN():
         y_preds_in = self.advreg_model.predict(self.X_train[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
-        # 0 means in, 1 means out
-        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == 0)[0])))
-        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
+        # 1 means in, 0 means out
+        print("Accuracy In: {}".format(len(np.where(y_preds_in >= 0.5)[0])))
+        print("Accuracy Out: {}".format(len(np.where(y_preds_out < 0.5)[0])))
 
         """
             True negatives
