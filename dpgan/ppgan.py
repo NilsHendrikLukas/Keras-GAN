@@ -15,16 +15,21 @@ from keras.datasets import mnist
 from keras.optimizers import Adam, SGD
 from keras import backend as K
 from keras import initializers
+from emnist import extract_training_samples
 
 from gradient_noise import add_gradient_noise
 
 class PPGAN():
     def __init__(self,
-                 max_data=40000,
+                 max_data=60000,
                  noise_std=0.0001,
                  mia_attacks=None
                  ):
         self.mia_attacks = mia_attacks
+        self.img_rows = 28
+        self.img_cols = 28
+        self.channels = 1
+        self.img_shape = (self.img_rows, self.img_cols, self.channels)
 
         NoisyAdam = add_gradient_noise(Adam)
 
@@ -33,10 +38,18 @@ class PPGAN():
         np.random.seed(0) # Deterministic output.
         self.random_dim = 100 # For consistency with other GAN implementations.
 
+        def normalize(data):
+            return np.reshape((data.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
         # Load data
         (X_train, y_train), (X_test, y_test) = mnist.load_data()
-        X_train = (X_train.astype(np.float32) - 127.5) / 127.5
+        X_train = normalize(X_train)
         self.X_train = X_train.reshape(60000, 784)
+
+        self.x_out, y_out = extract_training_samples('digits')
+        self.x_out = normalize(self.x_out)
+        self.x_out = self.x_out.reshape(240000, 784)
+
+        self.X_train = self.X_train[:max_data]
 
         # Generator
         generator = Sequential()
@@ -84,6 +97,9 @@ class PPGAN():
         # Losses for plotting
         self.discriminator_losses = []
         self.generator_losses = []
+
+        self.logan_precisions = []
+        self.featuremap_precisions = []
 
     def plot_loss(self, epoch):
         plt.figure(figsize=(10, 8))
@@ -148,22 +164,38 @@ class PPGAN():
 
                 log = ""
                 # Compute the "real" epoch (passes through the dataset)
-                log = log + "[{}/{}]".format((epochs*batch_size)//len(self.X_train), (epochs*batch_size)//len(self.X_train))
+                log = log + "[{}/{}]".format((e*batch_size)//len(self.X_train), (e*batch_size)//len(self.X_train))
                 if "logan" in self.mia_attacks:
                     precision = self.logan_mia(self.discriminator)
-                    logan_precisions.append(precision)
+                    self.logan_precisions.append(precision)
                     log = log + "[LOGAN Prec: {:.3f}]".format(precision)
                 if "featuremap" in self.mia_attacks:
                     precision = self.featuremap_mia()
-                    featuremap_precisions.append(precision)
+                    self.featuremap_precisions.append(precision)
                     log = log + "[FM Prec: {:.3f}]".format(precision)
 
-                log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
+                log = log + "%d [D loss: %f] [G loss: %f] " % (e, 1 - discriminator_loss, 1 - generator_loss)
                 print(log)
 
             # Store loss of most recent batch from this epoch
             self.discriminator_losses.append(discriminator_loss)
             self.generator_losses.append(generator_loss)
+
+            # ---------------------
+            #  Plot Statistics
+            # ---------------------
+
+            for attack in self.mia_attacks:
+                if attack == "logan":
+                    plt.plot(np.arange(len(self.logan_precisions)), self.logan_precisions, color="blue")
+                    plt.hlines(0.5, 0, len(self.logan_precisions), linestyles="dashed")
+                if attack =="featuremap":
+                    plt.plot(np.arange(len(self.featuremap_precisions)), self.featuremap_precisions, color="red")
+                    plt.hlines(0.5, 0, len(self.featuremap_precisions), linestyles="dashed")
+                plt.ylim((0, 1))
+                plt.xlabel("Iterations")
+                plt.ylabel("Success")
+                plt.show()
 
             self.plot_generated_images(e)
             if e == 1 or e % 20 == 0:
@@ -173,65 +205,66 @@ class PPGAN():
         plot_loss(e)
 
     def featuremap_mia(self, threshold=0.2):
-        """
-        Takes the classifiers featuremaps and predicts on them
-        """
-        test_size = 256
-        epochs = 5
-        batch_size = min(128, len(self.x_train))
+        # """
+        # Takes the classifiers featuremaps and predicts on them
+        # """
+        # test_size = 256
+        # epochs = 5
+        # batch_size = min(128, len(self.x_train))
 
-        for e in range(epochs):
-            idx_in  = np.random.randint(0, len(self.x_train), batch_size)
-            idx_out = np.random.randint(0, len(self.x_out), batch_size)
+        # for e in range(epochs):
+        #     idx_in  = np.random.randint(0, len(self.x_train), batch_size)
+        #     idx_out = np.random.randint(0, len(self.x_out), batch_size)
 
-            x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
+        #     x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
 
-            valid = -np.ones((batch_size, 1))
-            fake = np.ones((batch_size, 1))
-            d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
-            d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
+        #     valid = -np.ones((batch_size, 1))
+        #     fake = np.ones((batch_size, 1))
+        #     d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
+        #     d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
-        idx_in = np.random.randint(0, len(self.x_train), test_size)
-        idx_out = np.random.randint(0, len(self.x_out), test_size)
+        # idx_in = np.random.randint(0, len(self.x_train), test_size)
+        # idx_out = np.random.randint(0, len(self.x_out), test_size)
 
-        y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
-        y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
+        # y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
+        # y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
-        # -1 means in, 1 means out
-        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
-        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
+        # # -1 means in, 1 means out
+        # print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
+        # print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
-        """
-            True negatives
-        """
-        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
-        p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+        # """
+        #     True negatives
+        # """
+        # p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        # p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
 
-        # How many of the ones that are in are covered:
-        true_negatives, = np.where(p >= len(y_preds_in))
-        false_negatives, = np.where(p < len(y_preds_in))
+        # # How many of the ones that are in are covered:
+        # true_negatives, = np.where(p >= len(y_preds_in))
+        # false_negatives, = np.where(p < len(y_preds_in))
 
-        print("True Negatives: {}/{}".format(len(true_negatives), len(p)))
-        print("False Negatives: {}".format(len(false_negatives)))
+        # print("True Negatives: {}/{}".format(len(true_negatives), len(p)))
+        # print("False Negatives: {}".format(len(false_negatives)))
 
-        precision = len(true_negatives) / (len(true_negatives) + len(false_negatives))
+        # precision = len(true_negatives) / (len(true_negatives) + len(false_negatives))
 
-        """
-            True Positives
-        """
-        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
-        p = p[:int((len(y_preds_out) + len(y_preds_in)) * threshold)]
+        # """
+        #     True Positives
+        # """
+        # p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        # p = p[:int((len(y_preds_out) + len(y_preds_in)) * threshold)]
 
-        # How many of the ones that are in are covered:
-        true_positives, = np.where(p < len(y_preds_in))
-        false_positives, = np.where(p >= len(y_preds_in))
+        # # How many of the ones that are in are covered:
+        # true_positives, = np.where(p < len(y_preds_in))
+        # false_positives, = np.where(p >= len(y_preds_in))
 
-        print("True Positives: {}/{}".format(len(true_positives), len(p)))
-        print("False Positives: {}".format(len(false_positives)))
+        # print("True Positives: {}/{}".format(len(true_positives), len(p)))
+        # print("False Positives: {}".format(len(false_positives)))
 
-        accuracy = (len(true_positives)+len(true_negatives)) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
+        # accuracy = (len(true_positives)+len(true_negatives)) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
 
-        return accuracy
+        # return accuracy
+        return
 
     def logan_mia(self,
                   critic_model,
