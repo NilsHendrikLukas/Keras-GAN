@@ -34,7 +34,7 @@ class PPGAN():
 
         NoisyAdam = add_gradient_noise(Adam)
 
-        K.set_image_dim_ordering('th')
+        K.image_data_format()
 
         noise_std = 2*128/max_data*np.sqrt(np.log(1/gamma))/eps
 
