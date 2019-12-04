@@ -126,11 +126,11 @@ class PPGAN():
             plt.axis('off')
 
         plt.tight_layout()
-        plt.savefig('images/gan_generated_image_epoch_{}.png'.format(epoch))
+        plt.savefig('Keras-GAN/dpgan/images/gan_generated_image_epoch_{}.png'.format(epoch))
 
     def save_models(self, epoch):
-        self.generator.save('models/gan_generator_epoch_{}.h5'.format(epoch))
-        self.discriminator.save('models/gan_discriminator_epoch_{}.h5'.format(epoch))
+        self.generator.save('Keras-GAN/dpgan/saved_model/gan_generator_epoch_{}.h5'.format(epoch))
+        self.discriminator.save('Keras-GAN/dpgan/saved_model/gan_discriminator_epoch_{}.h5'.format(epoch))
 
     def train(self, epochs=1, batch_size=64):
         batch_count = int(self.X_train.shape[0] / batch_size)
@@ -301,9 +301,6 @@ class PPGAN():
 
 
 if __name__ == '__main__':
-    for path in ['images', 'models']:
-        if not os.path.exists(path):
-            os.makedirs(path)
     ppgan = PPGAN(eps = 50, gamma = 0.000001, mia_attacks=["logan"])
     ppgan.train(100, 128)
 
