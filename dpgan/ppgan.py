@@ -118,7 +118,7 @@ class PPGAN():
         advreg_optimizer = Adam(lr=0.0002, beta_1=0.5)
         advreg_model.compile(optimizer=advreg_optimizer,
                        metrics=["accuracy"],
-                       loss='binary_crossentropy')
+                       loss=self.wasserstein_loss)
         self.advreg_model = advreg_model
 
         # GAN
@@ -138,6 +138,9 @@ class PPGAN():
 
         self.logan_precisions = []
         self.featuremap_precisions = []
+
+    def wasserstein_loss(self, y_true, y_pred):
+        return K.mean(y_true * y_pred)
 
     def build_advreg(self, input_shape):
         """ Build the model for the adversarial regularizer
@@ -263,7 +266,7 @@ class PPGAN():
         Takes the classifiers featuremaps and predicts on them
         """
         test_size = 256
-        epochs = 10
+        epochs = 5
         batch_size = min(128, len(self.X_train))
 
         for e in range(epochs):
@@ -272,8 +275,8 @@ class PPGAN():
 
             x_in, x_out = self.X_train[idx_in], self.x_out[idx_out]
 
-            valid = np.ones((batch_size, 1))
-            fake = np.zeros((batch_size, 1))
+            valid = -np.ones((batch_size, 1))
+            fake = np.ones((batch_size, 1))
             d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
             d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
@@ -283,9 +286,9 @@ class PPGAN():
         y_preds_in = self.advreg_model.predict(self.X_train[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
-        # 1 means in, 0 means out
-        print("Accuracy In: {}".format(len(np.where(y_preds_in >= 0.5)[0])))
-        print("Accuracy Out: {}".format(len(np.where(y_preds_out < 0.5)[0])))
+        # -1 means in, 1 means out
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         """
             True negatives
