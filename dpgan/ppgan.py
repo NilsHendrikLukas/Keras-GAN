@@ -190,6 +190,7 @@ class PPGAN():
             # ---------------------
 
             for attack in self.mia_attacks:
+                plt.figure()
                 if attack == "logan":
                     plt.plot(np.arange(len(self.logan_precisions)), self.logan_precisions, color="blue")
                     plt.hlines(0.5, 0, len(self.logan_precisions), linestyles="dashed")
@@ -206,7 +207,7 @@ class PPGAN():
                 self.save_models(e)
 
         # Plot losses from every epoch
-        plot_loss(e)
+        self.plot_loss(e)
 
     def featuremap_mia(self, threshold=0.2):
         # """
