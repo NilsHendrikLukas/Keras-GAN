@@ -22,7 +22,8 @@ from gradient_noise import add_gradient_noise
 class PPGAN():
     def __init__(self,
                  max_data=60000,
-                 noise_std=0.0001,
+                 eps = 50,
+                 gamma = 0.000001,
                  mia_attacks=None
                  ):
         self.mia_attacks = mia_attacks
@@ -35,6 +36,9 @@ class PPGAN():
 
         K.set_image_dim_ordering('th')
 
+        noise_std = 2*128/max_data*np.sqrt(np.log(1/gamma))/eps
+
+        print("Setting noise stadard deviation to " + str(noise_std))
         np.random.seed(0) # Deterministic output.
         self.random_dim = 100 # For consistency with other GAN implementations.
 
@@ -300,6 +304,6 @@ if __name__ == '__main__':
     for path in ['images', 'models']:
         if not os.path.exists(path):
             os.makedirs(path)
-    ppgan = PPGAN(noise_std=0.0001, mia_attacks=["logan"])
+    ppgan = PPGAN(eps = 50, gamma = 0.000001, mia_attacks=["logan"])
     ppgan.train(100, 128)
 
