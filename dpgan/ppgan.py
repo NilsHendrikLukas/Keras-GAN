@@ -283,9 +283,9 @@ class PPGAN():
         y_preds_in = self.advreg_model.predict(self.X_train[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
-        # 1 means in, 0 means out
-        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == 1)[0])))
-        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 0)[0])))
+        # 0 means in, 1 means out
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == 0)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         """
             True negatives
