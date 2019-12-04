@@ -275,8 +275,8 @@ class PPGAN():
 
             x_in, x_out = self.X_train[idx_in], self.x_out[idx_out]
 
-            valid = -np.ones((batch_size, 1))
-            fake = np.ones((batch_size, 1))
+            valid = np.ones((batch_size, 1))
+            fake = -np.ones((batch_size, 1))
             d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
             d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
@@ -287,8 +287,8 @@ class PPGAN():
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
         # -1 means in, 1 means out
-        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == 1)[0])))
-        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == -1)[0])))
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         """
             True negatives
