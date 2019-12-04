@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from keras.layers import Input
+from keras.layers import Input, Lambda
 from keras.models import Model, Sequential
 from keras.layers.core import Reshape, Dense, Dropout, Flatten
 from keras.layers.advanced_activations import LeakyReLU
@@ -54,6 +54,7 @@ class PPGAN():
         self.x_out = self.x_out.reshape(240000, 784)
 
         self.X_train = self.X_train[:max_data]
+        self.img_shape = self.X_train.shape[1]
 
         # Generator
         generator = Sequential()
@@ -70,22 +71,55 @@ class PPGAN():
         self.generator = generator
 
         # Discriminator
-        discriminator = Sequential()
-        discriminator.add(Dense(1024, input_dim=self.X_train.shape[1], kernel_initializer=initializers.RandomNormal(stddev=0.02)))
-        discriminator.add(LeakyReLU(0.2))
-        discriminator.add(Dropout(0.3))
-        discriminator.add(Dense(512))
-        discriminator.add(LeakyReLU(0.2))
-        discriminator.add(Dropout(0.3))
-        discriminator.add(Dense(256))
-        discriminator.add(LeakyReLU(0.2))
-        discriminator.add(Dropout(0.3))
-        discriminator.add(Dense(1, activation='sigmoid'))
+        # discriminator = Sequential()
+        # discriminator.add(Dense(1024, input_dim=self.X_train.shape[1], kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+        # discriminator.add(LeakyReLU(0.2))
+        # discriminator.add(Dropout(0.3))
+        # discriminator.add(Dense(512))
+        # discriminator.add(LeakyReLU(0.2))
+        # discriminator.add(Dropout(0.3))
+        # discriminator.add(Dense(256))
+        # discriminator.add(LeakyReLU(0.2))
+        # discriminator.add(Dropout(0.3))
+        # discriminator.add(Dense(1, activation='sigmoid'))
+        dropout = 0.3
+        critic_in = Input((self.img_shape,))
+        l0 = Dense(1024, input_shape=(self.img_shape,), kernel_initializer=initializers.RandomNormal(stddev=0.02))(critic_in)
+        l1 = LeakyReLU(alpha=0.2)(l0)
+        l2 = Dropout(dropout)(l1)
+        l3 = Dense(512)(l2)
+        l4 = LeakyReLU(alpha=0.2)(l3)
+        l5 = Dropout(dropout)(l4)
+        l6 = Dense(256)(l5)
+        l7 = LeakyReLU(alpha=0.2)(l6)
+        featuremaps = Dropout(dropout)(l7)
+        critic_out = Dense(1, name="critic_out", activation='sigmoid')(featuremaps)
+        discriminator = Model(inputs=[critic_in], outputs=[critic_out])
 
         clipnorm = 5.0
         discriminator_optimizer = NoisyAdam(lr=0.0002, beta_1=0.5, clipnorm=clipnorm, standard_deviation=noise_std)
         discriminator.compile(optimizer=discriminator_optimizer, loss='binary_crossentropy')
         self.discriminator = discriminator
+
+        featuremap_model = Model(inputs=[critic_in], outputs=[featuremaps])
+
+
+        advreg = self.build_advreg(input_shape=(256,))
+        mia_pred = advreg(featuremap_model(critic_in))
+
+        naming_layer = Lambda(lambda x: x, name='mia_pred')
+        mia_pred = naming_layer(mia_pred)
+
+        advreg_model = Model(inputs=[critic_in], outputs=[mia_pred])
+
+        # Do not train the critic when updating the adversarial regularizer
+        featuremap_model.trainable = False
+
+        advreg_optimizer = Adam(lr=0.0002, beta_1=0.5)
+        advreg_model.compile(optimizer=advreg_optimizer,
+                       metrics=["accuracy"],
+                       loss='binary_crossentropy')
+        self.advreg_model = advreg_model
 
         # GAN
         self.discriminator.trainable = False
@@ -104,6 +138,21 @@ class PPGAN():
 
         self.logan_precisions = []
         self.featuremap_precisions = []
+
+    def build_advreg(self, input_shape):
+        """ Build the model for the adversarial regularizer
+        """
+        advreg_in = Input(input_shape)
+
+        l0 = Dense(units=256)(advreg_in)
+        l1 = Dropout(0.2)(l0)
+        l2 = Dense(units=128)(l1)
+        l3 = Dropout(0.2)(l2)
+        l4 = Dense(units=10)(l3)
+
+        advreg_out = Dense(units=1, activation="linear")(l4)
+
+        return Model(advreg_in, advreg_out)
 
     def plot_loss(self, epoch):
         plt.figure(figsize=(10, 8))
@@ -210,66 +259,65 @@ class PPGAN():
         self.plot_loss(e)
 
     def featuremap_mia(self, threshold=0.2):
-        # """
-        # Takes the classifiers featuremaps and predicts on them
-        # """
-        # test_size = 256
-        # epochs = 5
-        # batch_size = min(128, len(self.x_train))
+        """
+        Takes the classifiers featuremaps and predicts on them
+        """
+        test_size = 256
+        epochs = 5
+        batch_size = min(128, len(self.X_train))
 
-        # for e in range(epochs):
-        #     idx_in  = np.random.randint(0, len(self.x_train), batch_size)
-        #     idx_out = np.random.randint(0, len(self.x_out), batch_size)
+        for e in range(epochs):
+            idx_in  = np.random.randint(0, len(self.X_train), batch_size)
+            idx_out = np.random.randint(0, len(self.x_out), batch_size)
 
-        #     x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
+            x_in, x_out = self.X_train[idx_in], self.x_out[idx_out]
 
-        #     valid = -np.ones((batch_size, 1))
-        #     fake = np.ones((batch_size, 1))
-        #     d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
-        #     d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
+            valid = np.ones((batch_size, 1))
+            fake = np.zeros((batch_size, 1))
+            d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
+            d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
-        # idx_in = np.random.randint(0, len(self.x_train), test_size)
-        # idx_out = np.random.randint(0, len(self.x_out), test_size)
+        idx_in = np.random.randint(0, len(self.X_train), test_size)
+        idx_out = np.random.randint(0, len(self.x_out), test_size)
 
-        # y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
-        # y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
+        y_preds_in = self.advreg_model.predict(self.X_train[idx_in])
+        y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
-        # # -1 means in, 1 means out
-        # print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
-        # print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
+        # 1 means in, 0 means out
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == 1)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 0)[0])))
 
-        # """
-        #     True negatives
-        # """
-        # p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
-        # p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
+        """
+            True negatives
+        """
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = p[-int((len(y_preds_out) + len(y_preds_in)) * threshold):]
 
-        # # How many of the ones that are in are covered:
-        # true_negatives, = np.where(p >= len(y_preds_in))
-        # false_negatives, = np.where(p < len(y_preds_in))
+        # How many of the ones that are in are covered:
+        true_negatives, = np.where(p >= len(y_preds_in))
+        false_negatives, = np.where(p < len(y_preds_in))
 
-        # print("True Negatives: {}/{}".format(len(true_negatives), len(p)))
-        # print("False Negatives: {}".format(len(false_negatives)))
+        print("True Negatives: {}/{}".format(len(true_negatives), len(p)))
+        print("False Negatives: {}".format(len(false_negatives)))
 
-        # precision = len(true_negatives) / (len(true_negatives) + len(false_negatives))
+        precision = len(true_negatives) / (len(true_negatives) + len(false_negatives))
 
-        # """
-        #     True Positives
-        # """
-        # p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
-        # p = p[:int((len(y_preds_out) + len(y_preds_in)) * threshold)]
+        """
+            True Positives
+        """
+        p = np.concatenate((y_preds_in, y_preds_out)).flatten().argsort()
+        p = p[:int((len(y_preds_out) + len(y_preds_in)) * threshold)]
 
-        # # How many of the ones that are in are covered:
-        # true_positives, = np.where(p < len(y_preds_in))
-        # false_positives, = np.where(p >= len(y_preds_in))
+        # How many of the ones that are in are covered:
+        true_positives, = np.where(p < len(y_preds_in))
+        false_positives, = np.where(p >= len(y_preds_in))
 
-        # print("True Positives: {}/{}".format(len(true_positives), len(p)))
-        # print("False Positives: {}".format(len(false_positives)))
+        print("True Positives: {}/{}".format(len(true_positives), len(p)))
+        print("False Positives: {}".format(len(false_positives)))
 
-        # accuracy = (len(true_positives)+len(true_negatives)) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
+        accuracy = (len(true_positives)+len(true_negatives)) / (len(true_positives)+len(true_negatives)+len(false_positives)+len(false_negatives))
 
-        # return accuracy
-        return
+        return accuracy
 
     def logan_mia(self,
                   critic_model,
@@ -302,6 +350,6 @@ class PPGAN():
 
 
 if __name__ == '__main__':
-    ppgan = PPGAN(eps = 50, gamma = 0.000001, mia_attacks=["logan"])
+    ppgan = PPGAN(eps = 50, gamma = 0.000001, mia_attacks=["logan", "featuremap"])
     ppgan.train(100, 128)
 
