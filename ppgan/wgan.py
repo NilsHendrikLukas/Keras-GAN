@@ -13,7 +13,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle
 from numpy import linalg, array, arange
-from dpgan.utilize import normlization, Rsample
+from ppgan.utilize import normlization, Rsample
 import logging
 
 logging.getLogger("tensorflow").setLevel(logging.ERROR)

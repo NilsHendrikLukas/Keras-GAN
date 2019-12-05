@@ -103,7 +103,6 @@ class PPGAN():
 
         featuremap_model = Model(inputs=[critic_in], outputs=[featuremaps])
 
-
         advreg = self.build_advreg(input_shape=(256,))
         mia_pred = advreg(featuremap_model(critic_in))
 
@@ -178,11 +177,11 @@ class PPGAN():
             plt.axis('off')
 
         plt.tight_layout()
-        plt.savefig('Keras-GAN/dpgan/images/gan_generated_image_epoch_{}.png'.format(epoch))
+        plt.savefig('Keras-GAN/ppgan/images/gan_generated_image_epoch_{}.png'.format(epoch))
 
     def save_models(self, epoch):
-        self.generator.save('Keras-GAN/dpgan/saved_model/gan_generator_epoch_{}.h5'.format(epoch))
-        self.discriminator.save('Keras-GAN/dpgan/saved_model/gan_discriminator_epoch_{}.h5'.format(epoch))
+        self.generator.save('Keras-GAN/ppgan/saved_model/gan_generator_epoch_{}.h5'.format(epoch))
+        self.discriminator.save('Keras-GAN/ppgan/saved_model/gan_discriminator_epoch_{}.h5'.format(epoch))
 
     def train(self, epochs=1, batch_size=64):
         batch_count = int(self.X_train.shape[0] / batch_size)

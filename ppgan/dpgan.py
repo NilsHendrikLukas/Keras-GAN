@@ -1,51 +1,40 @@
 from __future__ import print_function, division
 
 from keras.datasets import mnist
-from emnist import extract_training_samples
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Lambda
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
-from keras.optimizers import Adam
+from keras.optimizers import RMSprop, Adam
+from keras import initializers
+from gradient_noise import add_gradient_noise
+from mnist_models import build_generator, build_critic
+from emnist import extract_training_samples
+
 import keras.backend as K
 
 import matplotlib.pyplot as plt
+
 import sys
 
 import numpy as np
-from sklearn.utils import shuffle
 
-
-class DCGAN():
+class DPGAN():
     def __init__(self,
                  max_data=40000,
-                 mia_attacks=None,
-                 use_advreg=False):
-        """
-                :param max_data How much x_in data to use
-                :param mia_attacks List with following possible values ["logan", "dist", "featuremap"]
-                :param use_advreg Build with advreg or without
-        """
-
-        if mia_attacks is None:
-            mia_attacks = []
-
-        # Input shape
+                 noise_std=0.001,
+                 mia_attacks=None
+                 ):
         self.img_rows = 28
         self.img_cols = 28
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.latent_dim = 100
-        self.use_advreg = use_advreg
         self.mia_attacks = mia_attacks
 
-        np.random.seed(0)
-
-        #######################################
         def normalize(data):
-            return np.reshape(data / 127.5 - 1., (-1, *self.img_shape))
-
+            return np.reshape((data.astype(np.float32) - 127.5) / 127.5, (-1, *self.img_shape))
         # Load, normalize and split the dataset
         (self.x_train, _), (_, _) = mnist.load_data()
         self.x_train = normalize(self.x_train)
@@ -57,34 +46,34 @@ class DCGAN():
 
         print("Loading with {} data samples!".format(len(self.x_train)))
 
-        #########################################
+        # Following parameter and optimizer set as recommended in paper
+        self.n_critic = 5
+        self.clip_value = 5.0
+        NoisyAdam = add_gradient_noise(Adam)
+        discriminator_optimizer = NoisyAdam(lr=0.0002, beta_1=0.5, clipnorm=self.clip_value, standard_deviation=noise_std)
+        optimizer = RMSprop(lr=0.00005)
 
-        optimizer = Adam(0.0002, 0.5)
-
-        # Build and compile the discriminator
-        self.featuremap_model, self.discriminator, self.critic_model_with_advreg, self.advreg_model = self.build_discriminator(
-            optimizer)
+        # Build and compile the critic
+        self.critic, self.advreg_model = self.build_critic(discriminator_optimizer, optimizer)
 
         # Build the generator
         self.generator = self.build_generator()
 
-        # The generator takes noise as input and generates imgs
+        # The generator takes noise as input and generated imgs
         z = Input(shape=(self.latent_dim,))
         img = self.generator(z)
 
         # For the combined model we will only train the generator
-        self.discriminator.trainable = False
+        self.critic.trainable = False
 
-        # The discriminator takes generated images as input and determines validity
-        valid = self.discriminator(img)
+        # The critic takes generated images as input and determines validity
+        valid = self.critic(img)
 
-        # The combined model  (stacked generator and discriminator)
-        # Trains the generator to fool the discriminator
+        # The combined model  (stacked generator and critic)
         self.combined = Model(z, valid)
-        self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
-
-    def wasserstein_loss(self, y_true, y_pred):
-        return -K.mean(y_true * y_pred)
+        self.combined.compile(loss='binary_crossentropy',
+            optimizer=optimizer,
+            metrics=['accuracy'])
 
     def build_advreg(self, input_shape):
         """ Build the model for the adversarial regularizer
@@ -101,66 +90,61 @@ class DCGAN():
 
         return Model(advreg_in, advreg_out)
 
-
     def build_generator(self):
+        random_dim = 100
+        generator = Sequential()
+        generator.add(Dense(256, input_dim=random_dim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(512))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(1024))
+        generator.add(LeakyReLU(0.2))
+        generator.add(Dense(28*28, activation='tanh'))
+        generator.add(Reshape((28, 28, 1), input_shape=(28*28,)))
 
-        input_data = Input((self.latent_dim,))
 
-        l0 = Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim)(input_data)
-        l1 = Reshape((7, 7, 128))(l0)
-        l2 = UpSampling2D()(l1)
-        l3 = Conv2D(128, kernel_size=3, padding="same")(l2)
-        l4 = BatchNormalization(momentum=0.8)(l3)
-        l5 = Activation("relu")(l4)
-        l6 = UpSampling2D()(l5)
-        l7 = Conv2D(64, kernel_size=3, padding="same")(l6)
-        l8 = BatchNormalization(momentum=0.8)(l7)
-        l9 = Activation("relu")(l8)
-        l10 = Conv2D(self.channels, kernel_size=3, padding="same")(l9)
+        generator_optimizer = Adam(lr=0.0002, beta_1=0.5)
+        generator.compile(optimizer=generator_optimizer, loss='binary_crossentropy')
 
-        output = Activation("tanh")(l10)
+        return generator
 
-        return Model(input_data, output)
-
-    def build_discriminator(self, optimizer):
-        dropout = 0.25
+    def build_critic(self, critic_optimizer, advreg_optimizer):
+        """ Build the discriminators for MNIST with advreg
+        """
         img_shape = (28, 28, 1)
+
+        dropout = 0.3 # 0.25
 
         critic_in = Input(img_shape)
 
-        l0 = Conv2D(16, kernel_size=3, strides=2, input_shape=img_shape, padding="same")(critic_in)
+        l0 = Dense(1024, input_shape=img_shape, kernel_initializer=initializers.RandomNormal(stddev=0.02))(critic_in)
         l1 = LeakyReLU(alpha=0.2)(l0)
         l2 = Dropout(dropout)(l1)
-        l3 = Conv2D(32, kernel_size=3, strides=2, padding="same")(l2)
-        l4 = ZeroPadding2D(padding=((0, 1), (0, 1)))(l3)
-        l5 = BatchNormalization(momentum=0.8)(l4)
-        l6 = LeakyReLU(alpha=0.2)(l5)
-        l7 = Dropout(dropout)(l6)
-        l8 = Conv2D(64, kernel_size=3, strides=2, padding="same")(l7)
-        l9 = BatchNormalization(momentum=0.8)(l8)
-        l10 = LeakyReLU(alpha=0.2)(l9)
-        l11 = Dropout(dropout)(l10)
-        l12 = Conv2D(128, kernel_size=3, strides=1, padding="same")(l11)
-        l13 = BatchNormalization(momentum=0.8)(l12)
-        l14 = LeakyReLU(alpha=0.2)(l13)
-        l15 = Dropout(dropout)(l14)
-        featuremaps = Flatten()(l15)
-        critic_out = Dense(1, activation="sigmoid", name="critic_out")(featuremaps)
+        l3 = Dense(512)(l2)
+        l4 = LeakyReLU(alpha=0.2)(l3)
+        l5 = Dropout(dropout)(l4)
+        l6 = Dense(256)(l5)
+        l7 = LeakyReLU(alpha=0.2)(l6)
+        l8 = Dropout(dropout)(l7)
+        featuremaps = Flatten()(l8)
+        critic_out = Dense(1, name="critic_out", activation='sigmoid')(featuremaps)
 
         """ Build the critic WITHOUT the adversarial regularization
-                        """
+                """
         critic_model_without_advreg = Model(inputs=[critic_in], outputs=[critic_out])
 
-        critic_model_without_advreg.compile(optimizer=optimizer,
+        critic_model_without_advreg.compile(optimizer=critic_optimizer,
                                             metrics=["accuracy"],
                                             loss='binary_crossentropy')
+
 
         """ Build the adversarial regularizer
         If no adversarial regularization is required, disable it in the training function /!\
         """
         featuremap_model = Model(inputs=[critic_in], outputs=[featuremaps])
 
-        advreg = self.build_advreg(input_shape=(2048,))
+
+        advreg = self.build_advreg(input_shape=(256,))
         mia_pred = advreg(featuremap_model(critic_in))
 
         naming_layer = Lambda(lambda x: x, name='mia_pred')
@@ -171,38 +155,21 @@ class DCGAN():
         # Do not train the critic when updating the adversarial regularizer
         featuremap_model.trainable = False
 
-        def advreg(y_true, y_pred):
-            return 2*K.binary_crossentropy(y_true, y_pred)
+        advreg_model.compile(optimizer=advreg_optimizer,
+                       metrics=["accuracy"],
+                       loss=self.wasserstein_loss)
 
-        advreg_model.compile(optimizer=optimizer,
-                             metrics=["accuracy"],
-                             loss=self.wasserstein_loss)
+        return critic_model_without_advreg, advreg_model
 
-        """ Build the critic WITH the adversarial regularization 
-        """
-        critic_model_with_advreg = Model(inputs=[critic_in], outputs=[critic_out, mia_pred])
+    def wasserstein_loss(self, y_true, y_pred):
+        return K.mean(y_true * y_pred)
 
-        advreg_model.trainable = False
-
-        def critic_out(y_true, y_pred):
-            return K.binary_crossentropy(y_true, y_pred)
-
-        def mia_pred(y_true, y_pred):
-            return K.binary_crossentropy(y_true, y_pred)
-
-        critic_model_with_advreg.compile(optimizer=optimizer,
-                                         metrics=["accuracy"],
-                                         loss={
-                                             "critic_out": self.wasserstein_loss,
-                                             "mia_pred": self.wasserstein_loss
-                                         })
-
-        return featuremap_model, critic_model_without_advreg, critic_model_with_advreg, advreg_model
-
-    def train(self, epochs, batch_size=128, save_interval=50):
+    def train(self, epochs, batch_size=128, sample_interval=50):
+        # Store all precision values
         logan_precisions, featuremap_precisions = [], []
 
         # Adversarial ground truths
+        soft_valid = np.ones((batch_size, 1))*0.9
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
 
@@ -212,55 +179,34 @@ class DCGAN():
             #  Train Discriminator
             # ---------------------
 
-            # Select a random half of images
-            idx = np.random.randint(0, len(self.x_train), batch_size)
+            # Select a random batch of images
+            idx = np.random.randint(0, self.x_train.shape[0], batch_size)
             imgs = self.x_train[idx]
-
-            idx_out = np.random.randint(0, len(self.x_out), batch_size)
-            imgs_out = self.x_out[idx_out]
-
-            # Sample noise and generate a batch of new images
+            
+            # Sample noise as generator input
             noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+
+            # Generate a batch of new images
             gen_imgs = self.generator.predict(noise)
 
-            if self.use_advreg:
-                # Train the critic to make the advreg model produce FAKE labels
-                d_loss_real = self.discriminator.train_on_batch(imgs, valid)  # valid data
-                d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-
-                # Tried random, tried valid, next try skipping
-                self.critic_model_with_advreg.train_on_batch(imgs_out, [valid, valid])
-
-                d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
-            else:
-                d_loss_real = self.discriminator.train_on_batch(imgs, valid)
-                d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-                d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
-
-
-            # ---------------------
-            #  Train AdvReg
-            #  Do this in the outer loop to give the discriminator a chance to adapt
-            # ---------------------
-            if self.use_advreg:
-                def sample_target(size):
-                    return np.random.randint(0, 2, size)
-
-                idx_out = np.random.randint(0, len(self.x_out), batch_size)
-                imgs_out = self.x_out[idx_out]
-
-                idx_in = np.random.randint(0, len(self.x_train), batch_size)
-                imgs = self.x_train[idx_in]
-
-                adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
-                d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
+            # Train the critic
+            self.critic.treinable = True
+            d_loss_real = self.critic.train_on_batch(imgs, soft_valid)
+            d_loss_fake = self.critic.train_on_batch(gen_imgs, fake)
+            d_loss = 0.5 * np.add(d_loss_fake, d_loss_real)
 
             # ---------------------
             #  Train Generator
             # ---------------------
-
-            # Train the generator (wants discriminator to mistake images as real)
+            self.critic.treinable = False
             g_loss = self.combined.train_on_batch(noise, valid)
+
+            # Plot the progress
+            print ("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
+
+            # If at save interval => save generated image samples
+            if epoch % sample_interval == 0:
+                self.sample_images(epoch)
 
             # ---------------------
             #  Debug Output
@@ -268,10 +214,9 @@ class DCGAN():
 
             log = ""
             # Compute the "real" epoch (passes through the dataset)
-            log = log + "[{}/{}]".format((epoch * batch_size) // len(self.x_train),
-                                         (epochs * batch_size) // len(self.x_train))
+            log = log + "[{}/{}]".format((epoch*batch_size)//len(self.x_train), (epochs*batch_size)//len(self.x_train))
             if "logan" in self.mia_attacks:
-                precision = self.logan_mia(self.discriminator)
+                precision = self.logan_mia(self.critic)
                 logan_precisions.append(precision)
                 log = log + "[LOGAN Prec: {:.3f}]".format(precision)
             if "featuremap" in self.mia_attacks:
@@ -279,14 +224,11 @@ class DCGAN():
                 featuremap_precisions.append(precision)
                 log = log + "[FM Prec: {:.3f}]".format(precision)
 
-            if self.use_advreg:
-                log = log + "[A loss: %f]" % (1 - d_loss_advreg[0])
-
-            log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss)
+            log = log + "%d [D loss: %f] [G loss: %f] " % (epoch, 1 - d_loss[0], 1 - g_loss[0])
             print(log)
 
             # If at save interval => save generated image samples
-            if epoch % save_interval == 0:
+            if epoch != 0 and epoch % sample_interval == 0:
                 # ---------------------
                 #  Plot Statistics
                 # ---------------------
@@ -295,14 +237,17 @@ class DCGAN():
                     if attack == "logan":
                         plt.plot(np.arange(len(logan_precisions)), logan_precisions, color="blue")
                         plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
-                    if attack == "featuremap":
+                    if attack =="featuremap":
                         plt.plot(np.arange(len(featuremap_precisions)), featuremap_precisions, color="red")
                         plt.hlines(0.5, 0, len(logan_precisions), linestyles="dashed")
                     plt.ylim((0, 1))
                     plt.xlabel("Iterations")
                     plt.ylabel("Success")
                     plt.show()
-                self.save_imgs(epoch)
+                # ---------------------
+                #  Save images
+                # ---------------------
+                self.sample_images(epoch)
 
     def featuremap_mia(self, threshold=0.2):
         """
@@ -328,6 +273,10 @@ class DCGAN():
 
         y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
+
+        # -1 means in, 1 means out
+        print("Accuracy In: {}".format(len(np.where(np.sign(y_preds_in) == -1)[0])))
+        print("Accuracy Out: {}".format(len(np.where(np.sign(y_preds_out) == 1)[0])))
 
         """
             True negatives
@@ -361,6 +310,15 @@ class DCGAN():
 
         return accuracy
 
+    def execute_dist_mia(self):
+        n = 50
+        x_in, x_out = self.x_train[0:n], self.x_train[self.n_samples:self.n_samples + n]
+
+        max_acc = distance_mia(self.generator, x_in, x_out)
+
+        with open('Keras-GAN/dcgan/logs/dist_mia.csv', mode='a') as file_:
+            file_.write("{}".format(max_acc))
+            file_.write("\n")
 
     def logan_mia(self,
                   critic_model,
@@ -388,9 +346,34 @@ class DCGAN():
         true_positives, = np.where(p < len(y_preds_in))
         precision = len(true_positives) / (len(true_positives) + len(false_positives))
 
+
         return precision
 
-    def save_imgs(self, epoch):
+    def load_model(self):
+
+        def load(model, model_name):
+            weights_path = "Keras-GAN/wgan/saved_model/%s_weights.hdf5" % model_name
+            options = {"file_weight": weights_path}
+            model.load_weights(options['file_weight'])
+
+        load(self.generator, "generator_" + str(self.dataset))
+        load(self.critic, "discriminator_" + str(self.dataset))
+
+    def save_model(self):
+
+        def save(model, model_name):
+            model_path = "Keras-GAN/wgan/saved_model/%s.json" % model_name
+            weights_path = "Keras-GAN/wgan/saved_model/%s_weights.hdf5" % model_name
+            options = {"file_arch": model_path,
+                       "file_weight": weights_path}
+            json_string = model.to_json()
+            open(options['file_arch'], 'w').write(json_string)
+            model.save_weights(options['file_weight'])
+
+        save(self.generator, "generator_" + str(self.dataset))
+        save(self.critic, "discriminator_" + str(self.dataset))
+
+    def sample_images(self, epoch):
         r, c = 5, 5
         noise = np.random.normal(0, 1, (r * c, self.latent_dim))
         gen_imgs = self.generator.predict(noise)
@@ -402,17 +385,20 @@ class DCGAN():
         cnt = 0
         for i in range(r):
             for j in range(c):
+                #axs[i, j].imshow(gen_imgs[cnt, :, :].squeeze())
                 axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
-                axs[i,j].axis('off')
+                axs[i, j].axis('off')
                 cnt += 1
-        plt.show()
         try:
-            fig.savefig("dcgan/images/mnist_%d.png" % epoch)
+            fig.savefig("Keras-GAN/ppgan/images/%d.png" % (epoch))
         except:
             pass
+
         plt.close()
+
+        return gen_imgs
 
 
 if __name__ == '__main__':
-    dcgan = DCGAN(use_advreg=True, mia_attacks=["logan", "featuremap"])
-    dcgan.train(epochs=4000, batch_size=32, save_interval=50)
+    dpgan = DPGAN(noise_std = 0.0001, mia_attacks=["featuremap", "logan"])
+    dpgan.train(epochs=4000, batch_size=32, sample_interval=5)
