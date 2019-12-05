@@ -1,29 +1,26 @@
 from __future__ import print_function, division
 
-from keras.datasets import mnist
+import keras.backend as K
+import matplotlib.pyplot as plt
+import numpy as np
 from emnist import extract_training_samples
-from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Lambda
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
+from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Lambda
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
-from keras.models import Sequential, Model
+from keras.models import Model
 from keras.optimizers import Adam
-import keras.backend as K
-
-import matplotlib.pyplot as plt
-import sys
-
-import numpy as np
 from sklearn.utils import shuffle
 
 
 class DCGAN():
     def __init__(self,
-                 max_data=40000,
+                 n_xin=40000,
+                 n_xout=10000,
                  mia_attacks=None,
                  use_advreg=False):
-        """
-                :param max_data How much x_in data to use
+        """     Builds a DCGAN model with adversarial attacks
+                :param n_xin, n_xout Size of training and out-of-distribution data
                 :param mia_attacks List with following possible values ["logan", "dist", "featuremap"]
                 :param use_advreg Build with advreg or without
         """
@@ -42,22 +39,8 @@ class DCGAN():
 
         np.random.seed(0)
 
-        #######################################
-        def normalize(data):
-            return np.reshape(data / 127.5 - 1., (-1, *self.img_shape))
-
-        # Load, normalize and split the dataset
-        (self.x_train, _), (_, _) = mnist.load_data()
-        self.x_train = normalize(self.x_train)
-
-        self.x_out, y_out = extract_training_samples('digits')
-        self.x_out = normalize(self.x_out)
-
-        self.x_train = self.x_train[:max_data]
-
-        print("Loading with {} data samples!".format(len(self.x_train)))
-
-        #########################################
+        # Load the EMNIST data
+        (self.x_in, y_in), (self.x_out, y_out) = self.load_emnist_data(n_xin=n_xin, n_xout=n_xout)
 
         optimizer = Adam(0.0002, 0.5)
 
@@ -79,9 +62,36 @@ class DCGAN():
         valid = self.discriminator(img)
 
         # The combined model  (stacked generator and discriminator)
-        # Trains the generator to fool the discriminator
         self.combined = Model(z, valid)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
+
+    def load_emnist_data(self,
+                         n_xin,
+                         n_xout):
+        """
+        Load x_in, x_out and the test set
+        @:param n_xin: Size of the X_in dataset
+        @:param n_xout: Size of the X_out dataset
+        @:return xin, xout, test
+        """
+
+        def normalize(data):
+            return np.reshape((data.astype(np.float32) - 127.5) / 127.5, (-1, 28, 28, 1))
+
+        # Load and normalize the training data
+        (x_train, y_train) = extract_training_samples('digits')
+        x_train = normalize(x_train)
+
+        # Shuffle for some randomness
+        x_train, y_train = shuffle(x_train, y_train)
+
+        assert (n_xin + n_xout < len(x_train))  # No overflow, sizes have to be assured
+
+        # Split into x_in and x_out
+        x_in, y_in = x_train[:n_xin], y_train[:n_xin]
+        x_out, y_out = x_train[n_xin:n_xin + n_xout], y_train[n_xin:n_xin + n_xout]
+
+        return (x_in, y_in), (x_out, y_out)
 
     def wasserstein_loss(self, y_true, y_pred):
         return -K.mean(y_true * y_pred)
@@ -213,8 +223,8 @@ class DCGAN():
             # ---------------------
 
             # Select a random half of images
-            idx = np.random.randint(0, len(self.x_train), batch_size)
-            imgs = self.x_train[idx]
+            idx = np.random.randint(0, len(self.x_in), batch_size)
+            imgs = self.x_in[idx]
 
             idx_out = np.random.randint(0, len(self.x_out), batch_size)
             imgs_out = self.x_out[idx_out]
@@ -249,8 +259,8 @@ class DCGAN():
                 idx_out = np.random.randint(0, len(self.x_out), batch_size)
                 imgs_out = self.x_out[idx_out]
 
-                idx_in = np.random.randint(0, len(self.x_train), batch_size)
-                imgs = self.x_train[idx_in]
+                idx_in = np.random.randint(0, len(self.x_in), batch_size)
+                imgs = self.x_in[idx_in]
 
                 adv_x, adv_y = shuffle(np.concatenate((imgs, imgs_out)), np.concatenate((valid, fake)))
                 d_loss_advreg = self.advreg_model.train_on_batch(adv_x, adv_y)
@@ -268,8 +278,7 @@ class DCGAN():
 
             log = ""
             # Compute the "real" epoch (passes through the dataset)
-            log = log + "[{}/{}]".format((epoch * batch_size) // len(self.x_train),
-                                         (epochs * batch_size) // len(self.x_train))
+            log = log + "[{}]".format(epoch)
             if "logan" in self.mia_attacks:
                 precision = self.logan_mia(self.discriminator)
                 logan_precisions.append(precision)
@@ -310,23 +319,23 @@ class DCGAN():
         """
         test_size = 256
         epochs = 5
-        batch_size = min(128, len(self.x_train))
+        batch_size = min(min(128, len(self.x_in)), len(self.x_out))
 
         for e in range(epochs):
-            idx_in  = np.random.randint(0, len(self.x_train), batch_size)
+            idx_in  = np.random.randint(0, len(self.x_in), batch_size)
             idx_out = np.random.randint(0, len(self.x_out), batch_size)
 
-            x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
+            x_in, x_out = self.x_in[idx_in], self.x_out[idx_out]
 
             valid = -np.ones((batch_size, 1))
             fake = np.ones((batch_size, 1))
             d_loss_real = self.advreg_model.train_on_batch(x_in, valid)
             d_loss_fake = self.advreg_model.train_on_batch(x_out, fake)
 
-        idx_in = np.random.randint(0, len(self.x_train), test_size)
+        idx_in = np.random.randint(0, len(self.x_in), test_size)
         idx_out = np.random.randint(0, len(self.x_out), test_size)
 
-        y_preds_in = self.advreg_model.predict(self.x_train[idx_in])
+        y_preds_in = self.advreg_model.predict(self.x_in[idx_in])
         y_preds_out = self.advreg_model.predict(self.x_out[idx_out])
 
         """
@@ -361,7 +370,6 @@ class DCGAN():
 
         return accuracy
 
-
     def logan_mia(self,
                   critic_model,
                   threshold=0.2):
@@ -369,9 +377,9 @@ class DCGAN():
         LOGAN is an attack that passes all examples through the critic and classifies those as members with
         a threshold higher than the passed value
         """
-        batch_size = min(1024, len(self.x_train))
-        idx_in, idx_out = np.random.randint(0, len(self.x_train), batch_size), np.random.randint(0, len(self.x_out), batch_size)
-        x_in, x_out = self.x_train[idx_in], self.x_out[idx_out]
+        batch_size = min(min(1024, len(self.x_in)), len(self.x_out))
+        idx_in, idx_out = np.random.randint(0, len(self.x_in), batch_size), np.random.randint(0, len(self.x_out), batch_size)
+        x_in, x_out = self.x_in[idx_in], self.x_out[idx_out]
 
         y_preds_in = critic_model.predict(x_in)
         y_preds_out = critic_model.predict(x_out)
