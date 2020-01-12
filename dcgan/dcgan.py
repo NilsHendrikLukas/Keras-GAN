@@ -65,6 +65,16 @@ class DCGAN():
         self.combined = Model(z, valid)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
 
+    def get_xin(self):
+        """ Gets the members
+        """
+        return self.x_in
+
+    def get_xout(self):
+        """ Gets the non-members
+        """
+        return self.x_out
+
     def load_emnist_data(self,
                          n_xin,
                          n_xout):
