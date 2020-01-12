@@ -68,7 +68,6 @@ class DCGAN():
 
         img = Conv2D(3, (1, 1), activation='sigmoid', padding='same', name="final_block")(d)  ## 32, 32
         model = Model(input_noise, img)
-        model.summary()
         return model
 
     def build_discriminator(self):
@@ -101,7 +100,7 @@ class DCGAN():
               save_interval=50):
 
         # Rescale -1 to 1
-        x_train = x_train / np.mean(x_train)
+        x_train = x_train / np.mean(x_train) - 1.
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
