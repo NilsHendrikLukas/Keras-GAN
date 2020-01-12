@@ -50,7 +50,7 @@ class DCGAN():
 
     def build_generator(self):
 
-        input_noise = Input(shape=self.latent_dim)
+        input_noise = Input(shape=(self.latent_dim,))
         d = Dense(1024, activation="relu")(input_noise)
         d = Dense(1024, activation="relu")(input_noise)
         d = Dense(128 * 8 * 8, activation="relu")(d)
@@ -114,7 +114,7 @@ class DCGAN():
             # ---------------------
 
             # Select a random half of images
-            idx = np.random.randint(0, X_train.shape[0], batch_size)
+            idx = np.random.randint(0, x_train.shape[0], batch_size)
             imgs = x_train[idx]
 
             # Sample noise and generate a batch of new images
@@ -155,7 +155,7 @@ class DCGAN():
                 axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
                 axs[i,j].axis('off')
                 cnt += 1
-        fig.savefig("Keras-GAN/dcgan/images/mnist_%d.png" % epoch)
+        fig.savefig("Keras-GAN/dcgan/images/celeba_%d.png" % epoch)
         plt.close()
 
 
