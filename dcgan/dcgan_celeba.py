@@ -50,48 +50,57 @@ class DCGAN():
 
     def build_generator(self):
 
-        input_noise = Input(shape=(self.latent_dim,))
-        d = Dense(1024, activation="relu")(input_noise)
-        d = Dense(1024, activation="relu")(input_noise)
-        d = Dense(128 * 8 * 8, activation="relu")(d)
-        d = Reshape((8, 8, 128))(d)
+        model = Sequential()
 
-        d = Conv2DTranspose(128, kernel_size=(2, 2), strides=(2, 2), use_bias=False)(d)
-        d = Conv2D(64, (1, 1), activation='relu', padding='same', name="block_4")(d)  ## 16,16
+        model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
+        model.add(Reshape((7, 7, 128)))
+        model.add(UpSampling2D())
+        model.add(Conv2D(128, kernel_size=3, padding="same"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Activation("relu"))
+        model.add(UpSampling2D())
+        model.add(Conv2D(64, kernel_size=3, padding="same"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Activation("relu"))
+        model.add(Conv2D(self.channels, kernel_size=3, padding="same"))
+        model.add(Activation("tanh"))
 
-        d = Conv2DTranspose(32, kernel_size=(2, 2), strides=(2, 2), use_bias=False)(d)
-        d = Conv2D(64, (1, 1), activation='relu', padding='same', name="block_5")(d)  ## 32,32
+        model.summary()
 
-        if self.input_shape[0] == 64:
-            d = Conv2DTranspose(32, kernel_size=(2, 2), strides=(2, 2), use_bias=False)(d)
-            d = Conv2D(64, (1, 1), activation='relu', padding='same', name="block_6")(d)  ## 64,64
+        noise = Input(shape=(self.latent_dim,))
+        img = model(noise)
 
-        img = Conv2D(3, (1, 1), activation='sigmoid', padding='same', name="final_block")(d)  ## 32, 32
-        model = Model(input_noise, img)
-        return model
+        return Model(noise, img)
 
     def build_discriminator(self):
 
-        input_img = Input(shape=self.input_shape)
+        model = Sequential()
 
-        x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block1_conv1')(input_img)
-        x = Conv2D(32, (3, 3), activation='relu', padding='same', name='block1_conv2')(x)
-        x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
+        model.add(Conv2D(32, kernel_size=3, strides=2, input_shape=self.input_shape, padding="same"))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(Dropout(0.25))
+        model.add(Conv2D(64, kernel_size=3, strides=2, padding="same"))
+        model.add(ZeroPadding2D(padding=((0, 1), (0, 1))))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(Dropout(0.25))
+        model.add(Conv2D(128, kernel_size=3, strides=2, padding="same"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(Dropout(0.25))
+        model.add(Conv2D(256, kernel_size=3, strides=1, padding="same"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(Dropout(0.25))
+        model.add(Flatten())
+        model.add(Dense(1, activation='sigmoid'))
 
-        x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block2_conv1')(x)
-        x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block2_conv2')(x)
-        x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
+        model.summary()
 
-        x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block4_conv1')(x)
-        x = Conv2D(128, (3, 3), activation='relu', padding='same', name='block4_conv2')(x)
-        x = MaxPooling2D((2, 2), strides=(1, 1), name='block4_pool')(x)
+        img = Input(shape=self.input_shape)
+        validity = model(img)
 
-        x = Flatten()(x)
-        x = Dense(1024, activation="relu")(x)
-        out = Dense(1, activation='sigmoid')(x)
-        model = Model(input_img, out)
-
-        return model
+        return Model(img, validity)
 
     def train(self,
               x_train,
