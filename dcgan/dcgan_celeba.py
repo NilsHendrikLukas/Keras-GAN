@@ -51,19 +51,22 @@ class DCGAN():
     def build_generator(self):
 
         model = Sequential()
-
-        model.add(Dense(128 * 7 * 7, activation="relu", input_dim=self.latent_dim))
-        model.add(Reshape((7, 7, 128)))
-        model.add(UpSampling2D())
-        model.add(Conv2D(128, kernel_size=3, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Activation("relu"))
-        model.add(UpSampling2D())
-        model.add(Conv2D(64, kernel_size=3, padding="same"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Activation("relu"))
-        model.add(Conv2D(self.channels, kernel_size=3, padding="same"))
-        model.add(Activation("tanh"))
+        # foundation for 4x4 image
+        n_nodes = 256 * 4 * 4
+        model.add(Dense(n_nodes, input_dim=self.latent_dim))
+        model.add(LeakyReLU(alpha=0.2))
+        model.add(Reshape((4, 4, 256)))
+        # upsample to 8x8
+        model.add(Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same'))
+        model.add(LeakyReLU(alpha=0.2))
+        # upsample to 16x16
+        model.add(Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same'))
+        model.add(LeakyReLU(alpha=0.2))
+        # upsample to 32x32
+        model.add(Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same'))
+        model.add(LeakyReLU(alpha=0.2))
+        # output layer
+        model.add(Conv2D(3, (3, 3), activation='tanh', padding='same'))
 
         model.summary()
 
